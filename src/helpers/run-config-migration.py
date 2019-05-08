@@ -143,6 +143,8 @@ def update_config_versions(config_file_name):
 
         migrate_script_dir = os.path.join(vyatta_migrate_util_dir, key)
 
+        logging.info("Migrating {} component.".format(key))
+
         while cfg_ver != sys_ver:
             if cfg_ver < sys_ver:
                 next_ver = cfg_ver + 1
@@ -154,7 +156,7 @@ def update_config_versions(config_file_name):
                     '{}-to-{}'.format(cfg_ver, next_ver))
 
             logging.debug("Trying migration script"
-                    "{}".format(migrate_script))
+                    "{}.".format(migrate_script))
 
             # subprocess.run() was introduced in python 3.5;
             # jessie has 3.4.2
@@ -164,10 +166,10 @@ def update_config_versions(config_file_name):
                     config_file_name])
             except FileNotFoundError:
                 logging.debug("Migration script {} does not exist; "
-                        "not fatal".format(migrate_script))
+                        "not fatal.".format(migrate_script))
             except subprocess.CalledProcessError as err:
-                logging.critical("Fatal error {}".format(err))
-                print("Called process error: {}".format(err))
+                logging.critical("Fatal error {}.".format(err))
+                print("Called process error: {}.".format(err))
                 sys.exit(1)
 
             cfg_ver = next_ver
@@ -192,7 +194,7 @@ def main():
                 format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S')
     except PermissionError as err:
-        print("Permissions error: {}".format(err))
+        print("Error opening log file: {}.".format(err))
 
     root_logger = logging.getLogger()
 
@@ -205,14 +207,14 @@ def main():
 
     if not os.access(config_file_name, os.R_OK):
         logging.critical("Unable to read config file "
-                "{}".format(config_file_name))
-        print("Read error: {}".format(config_file_name))
+                "'{}'.".format(config_file_name))
+        print("Read error: {}.".format(config_file_name))
         sys.exit(1)
 
     if not os.access(config_file_name, os.W_OK):
         logging.critical("Unable to modify config file "
-                "{}".format(config_file_name))
-        print("Write error: {}".format(config_file_name))
+                "'{}'".format(config_file_name))
+        print("Write error: {}.".format(config_file_name))
         sys.exit(1)
 
     separator = "."
@@ -224,8 +226,8 @@ def main():
         subprocess.check_output(['cp', '-p', config_file_name,
             backup_file_name])
     except subprocess.CalledProcessError as err:
-        logging.critical("Fatal error {}".format(err))
-        print("Called process error: {}".format(err))
+        logging.critical("Fatal error {}.".format(err))
+        print("Called process error: {}.".format(err))
         sys.exit(1)
 
     update_config_versions(config_file_name)
