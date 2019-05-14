@@ -13,7 +13,12 @@ import vyos.version
 vyatta_config_migrate_dir = '/opt/vyatta/etc/config-migrate'
 vyatta_system_version_dir = os.path.join(vyatta_config_migrate_dir, 'current')
 vyatta_migrate_util_dir = os.path.join(vyatta_config_migrate_dir, 'migrate')
+vyatta_migrate_log_dir = '/var/log/vyatta'
 vyatta_migrate_log = '/var/log/vyatta/migrate.log'
+
+# this is a quick hack to check if preserving era allows us to replace
+# existing vyatta_config_migrate; mods after
+config_file_era = 'vyatta'
 
 def get_config_file_versions(config_file_handle):
     """
@@ -28,6 +33,8 @@ def get_config_file_versions(config_file_handle):
                 raise ValueError("malformed configuration string: "
                         "{}".format(config_line))
 
+            config_file_era = 'vyatta'
+
             for pair in re.findall(r'([\w,-]+)@(\d+)', config_line):
                 if pair[0] in config_file_versions.keys():
                     logging.info("duplicate unit name: {} in string: "
@@ -38,6 +45,8 @@ def get_config_file_versions(config_file_handle):
             if not re.match(r'// vyos-config-version:\s+"([\w,-]+@\d+:)+([\w,-]+@\d+)"\s*', config_line):
                 raise ValueError("malformed configuration string: "
                         "{}".format(config_line))
+
+            config_file_era = 'vyos'
 
             for pair in re.findall(r'([\w,-]+)@(\d+)', config_line):
                 if pair[0] in config_file_versions.keys():
@@ -98,15 +107,24 @@ def write_config_file_version_string(config_file_name, config_versions):
 
     version_string = vyos.version.get_version()
 
+    print(config_versions)
+    print(component_versions)
+
     # For vyatta style version comments, or if we pass vyos style non-
     # significant comments through the parser instead of dropping at the
     # lexer, remove old version lines here:
     remove_config_file_version_string(config_file_name)
 
-    with open(config_file_name, 'a') as config_file_handle:
-        config_file_handle.write('// Warning: Do not remove the following line.\n')
-        config_file_handle.write('// vyos-config-version: "{}"\n'.format(component_versions))
-        config_file_handle.write('// Release version: {}\n'.format(version_string))
+    if config_file_era == 'vyatta':
+        with open(config_file_name, 'a') as config_file_handle:
+            config_file_handle.write('/* Warning: Do not remove the following line. */\n')
+            config_file_handle.write('/* === vyatta-config-version: "{}" === */\n'.format(component_versions))
+            config_file_handle.write('/* Release version: {} */\n'.format(version_string))
+    elif config_file_era == 'vyos':
+        with open(config_file_name, 'a') as config_file_handle:
+            config_file_handle.write('// Warning: Do not remove the following line.\n')
+            config_file_handle.write('// vyos-config-version: "{}"\n'.format(component_versions))
+            config_file_handle.write('// Release version: {}\n'.format(version_string))
 
 def update_config_versions(config_file_name):
     """
@@ -189,12 +207,14 @@ def main():
             help="Show log messages on stdout.")
     args = argparser.parse_args()
 
-    try:
-        logging.basicConfig(filename=vyatta_migrate_log, level=logging.INFO,
+    if os.path.isdir(vyatta_migrate_log_dir):
+        try:
+            logging.basicConfig(filename=vyatta_migrate_log, filemode='a+',
+                level=logging.INFO,
                 format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S')
-    except PermissionError as err:
-        print("Error opening log file: {}.".format(err))
+        except PermissionError as err:
+            print("Error opening log file: {}.".format(err))
 
     root_logger = logging.getLogger()
 
