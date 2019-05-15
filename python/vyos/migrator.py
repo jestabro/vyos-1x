@@ -91,7 +91,6 @@ class Migrator(object):
         Write new version string.
         """
         component_version_string = formatversions.format_versions_string(config_versions)
-        print(component_version_string)
 
         os_version_string = vyos.version.get_version()
 
