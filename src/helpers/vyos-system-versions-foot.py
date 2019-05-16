@@ -12,5 +12,5 @@ component_string = formatversions.format_versions_string(sys_versions)
 os_version_string = vyos.version.get_version()
 
 sys.stdout.write("\n\n")
-formatversions.write_vyatta_versions_foot(None, component_string,
-                                          os_version_string)
+formatversions.write_vyos_versions_foot(None, component_string,
+                                        os_version_string)

@@ -26,13 +26,13 @@ class Migrator(object):
         cfg_file = self._config_file
         component_versions = {}
 
-        cfg_versions = formatversions.read_vyatta_versions_from_file(cfg_file)
+        cfg_versions = formatversions.read_vyatta_versions(cfg_file)
 
         if bool(cfg_versions):
             self._config_file_vintage = 'vyatta'
             component_versions = cfg_versions
 
-        cfg_versions = formatversions.read_vyos_versions_from_file(cfg_file)
+        cfg_versions = formatversions.read_vyos_versions(cfg_file)
 
         if bool(cfg_versions):
             self._config_file_vintage = 'vyos'
@@ -86,7 +86,7 @@ class Migrator(object):
 
         return rev_versions
 
-    def write_config_file_versions_string(self, config_versions):
+    def write_config_file_versions(self, config_versions):
         """
         Write new version string.
         """
@@ -101,12 +101,12 @@ class Migrator(object):
             self._config_file_vintage = vyos.migration_defaults.default_vintage
 
         if self._config_file_vintage == 'vyatta':
-            formatversions.write_vyatta_versions_to_file(self._config_file,
+            formatversions.write_vyatta_versions_foot(self._config_file,
                                          component_version_string,
                                          os_version_string)
 
         if self._config_file_vintage == 'vyos':
-            formatversions.write_vyos_versions_to_file(self._config_file,
+            formatversions.write_vyos_versions_foot(self._config_file,
                                         component_version_string,
                                         os_version_string)
 
@@ -123,9 +123,9 @@ class Migrator(object):
 
         rev_versions = self.run_migration_scripts(cfg_versions, sys_versions)
 
-        formatversions.remove_versions_from_file(cfg_file)
+        formatversions.remove_versions(cfg_file)
 
-        self.write_config_file_versions_string(rev_versions)
+        self.write_config_file_versions(rev_versions)
 
 
 class VirtualMigrator(Migrator):
@@ -141,7 +141,7 @@ class VirtualMigrator(Migrator):
                   "migration not possible")
             sys.exit(0)
 
-        formatversions.remove_versions_from_file(cfg_file)
+        formatversions.remove_versions(cfg_file)
 
         self.write_config_file_versions_string(cfg_versions)
 

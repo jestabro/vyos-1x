@@ -3,7 +3,7 @@ import os
 import re
 import fileinput
 
-def read_vyatta_versions_from_file(config_file):
+def read_vyatta_versions(config_file):
     config_file_versions = {}
 
     with open(config_file, 'r') as config_file_handle:
@@ -19,7 +19,7 @@ def read_vyatta_versions_from_file(config_file):
 
     return config_file_versions
 
-def read_vyos_versions_from_file(config_file):
+def read_vyos_versions(config_file):
     config_file_versions = {}
 
     with open(config_file, 'r') as config_file_handle:
@@ -34,7 +34,7 @@ def read_vyos_versions_from_file(config_file):
 
     return config_file_versions
 
-def remove_versions_from_file(config_file):
+def remove_versions(config_file):
     """
     Remove old version string.
     """
@@ -68,26 +68,27 @@ def format_versions_string(config_versions):
 
     return component_version_string
 
-def write_vyatta_versions_to_file(config_file, component_version_string,
+def write_vyatta_versions_foot(config_file, component_version_string,
                                  os_version_string):
-    with open(config_file, 'a') as config_file_handle:
-        config_file_handle.write('/* Warning: Do not remove the following line. */\n')
-        config_file_handle.write('/* === vyatta-config-version: "{}" === */\n'.format(component_version_string))
-        config_file_handle.write('/* Release version: {} */\n'.format(os_version_string))
+    if config_file:
+        with open(config_file, 'a') as config_file_handle:
+            config_file_handle.write('/* Warning: Do not remove the following line. */\n')
+            config_file_handle.write('/* === vyatta-config-version: "{}" === */\n'.format(component_version_string))
+            config_file_handle.write('/* Release version: {} */\n'.format(os_version_string))
+    else:
+        sys.stdout.write('/* Warning: Do not remove the following line. */\n')
+        sys.stdout.write('/* === vyatta-config-version: "{}" === */\n'.format(component_version_string))
+        sys.stdout.write('/* Release version: {} */\n'.format(os_version_string))
 
-def print_vyatta_versions(component_version_string, os_version_string):
-    sys.stdout.write('/* Warning: Do not remove the following line. */\n')
-    sys.stdout.write('/* === vyatta-config-version: "{}" === */\n'.format(component_version_string))
-    sys.stdout.write('/* Release version: {} */\n'.format(os_version_string))
-
-def write_vyos_versions_to_file(config_file, component_version_string,
+def write_vyos_versions_foot(config_file, component_version_string,
                                os_version_string):
-    with open(config_file, 'a') as config_file_handle:
-        config_file_handle.write('// Warning: Do not remove the following line.\n')
-        config_file_handle.write('// vyos-config-version: "{}"\n'.format(component_version_string))
-        config_file_handle.write('// Release version: {}\n'.format(os_version_string))
+    if config_file:
+        with open(config_file, 'a') as config_file_handle:
+            config_file_handle.write('// Warning: Do not remove the following line.\n')
+            config_file_handle.write('// vyos-config-version: "{}"\n'.format(component_version_string))
+            config_file_handle.write('// Release version: {}\n'.format(os_version_string))
+    else:
+        sys.stdout.write('// Warning: Do not remove the following line.\n')
+        sys.stdout.write('// vyos-config-version: "{}"\n'.format(component_version_string))
+        sys.stdout.write('// Release version: {}\n'.format(os_version_string))
 
-def print_vyos_versions(component_version_string, os_version_string):
-    sys.stdout.write('// Warning: Do not remove the following line.\n')
-    sys.stdout.write('// vyos-config-version: "{}"\n'.format(component_version_string))
-    sys.stdout.write('// Release version: {}\n'.format(os_version_string))
