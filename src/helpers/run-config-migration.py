@@ -11,9 +11,12 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('config_file', type=str,
             help="configuration file to migrate")
+    argparser.add_argument('--force', action='store_true',
+            help="Force calling of all migration scripts")
     args = argparser.parse_args()
 
     config_file_name = args.config_file
+    force_on = args.force
 
     if not os.access(config_file_name, os.R_OK):
         print("Read error: {}.".format(config_file_name))
@@ -35,7 +38,7 @@ def main():
         print("Called process error: {}.".format(err))
         sys.exit(1)
 
-    migration = Migrator(config_file_name)
+    migration = Migrator(config_file_name, force=force_on)
 
     migration.run()
 
