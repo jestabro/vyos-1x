@@ -86,11 +86,11 @@ class Migrator(object):
 
         return rev_versions
 
-    def write_config_file_versions(self, config_versions):
+    def write_config_file_versions(self, cfg_versions):
         """
         Write new version string.
         """
-        component_version_string = formatversions.format_versions_string(config_versions)
+        versions_string = formatversions.format_versions_string(cfg_versions)
 
         os_version_string = vyos.version.get_version()
 
@@ -102,13 +102,13 @@ class Migrator(object):
 
         if self._config_file_vintage == 'vyatta':
             formatversions.write_vyatta_versions_foot(self._config_file,
-                                         component_version_string,
-                                         os_version_string)
+                                                      versions_string,
+                                                      os_version_string)
 
         if self._config_file_vintage == 'vyos':
             formatversions.write_vyos_versions_foot(self._config_file,
-                                        component_version_string,
-                                        os_version_string)
+                                                    versions_string,
+                                                    os_version_string)
 
     def run(self):
         cfg_file = self._config_file
