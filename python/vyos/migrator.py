@@ -11,9 +11,9 @@ class MigratorError(Exception):
     pass
 
 class Migrator(object):
-    def __init__(self, config_file, forced=False, set_vintage=None):
+    def __init__(self, config_file, force=False, set_vintage=None):
         self._config_file = config_file
-        self._forced = forced
+        self._force = force
         self._set_vintage = set_vintage
         self._config_file_vintage = None
         pass
@@ -113,10 +113,10 @@ class Migrator(object):
     def run(self):
         cfg_file = self._config_file
 
-        if not self._forced:
-            cfg_versions = self.get_config_file_versions()
-        else:
+        cfg_versions = self.get_config_file_versions()
+        if self._force:
             # This will force calling all migration scripts.
+            # Nontheless, call get_config_file_versions to set vintage.
             cfg_versions = {}
 
         sys_versions = systemversions.get_system_versions()
