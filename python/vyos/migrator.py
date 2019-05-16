@@ -143,5 +143,5 @@ class VirtualMigrator(Migrator):
 
         formatversions.remove_versions(cfg_file)
 
-        self.write_config_file_versions_string(cfg_versions)
+        self.write_config_file_versions(cfg_versions)
 

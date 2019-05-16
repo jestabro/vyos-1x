@@ -5,7 +5,7 @@ import sys
 import argparse
 import datetime
 import subprocess
-from vyos.migrator import Migrator
+from vyos.migrator import VirtualMigrator
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -35,7 +35,7 @@ def main():
         print("Called process error: {}.".format(err))
         sys.exit(1)
 
-    migration = Migrator(config_file_name)
+    migration = VirtualMigrator(config_file_name)
 
     migration.run()
 
