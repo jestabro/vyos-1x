@@ -1,6 +1,5 @@
 import sys
 import os
-import re
 import subprocess
 import vyos.version
 import vyos.defaults
@@ -19,8 +18,8 @@ class Migrator(object):
 
     def get_config_file_versions(self):
         """
-        Get component versions from config file; return empty dictionary if
-        config string is missing.
+        Get component versions from config file footer; return empty
+        dictionary if config string is missing.
         """
         cfg_file = self._config_file
         component_versions = {}
@@ -40,11 +39,12 @@ class Migrator(object):
         return component_versions
 
     def run_migration_scripts(self, config_file_versions, system_versions):
+        """
+        Run migration scripts iteratively, until config file version equals
+        system component version.
+        """
         cfg_versions = config_file_versions
         sys_versions = system_versions
-
-        for key in cfg_versions.keys() - sys_versions.keys():
-            sys_versions[key] = 0
 
         sys_keys = list(sys_versions.keys())
         sys_keys.sort()
@@ -61,11 +61,8 @@ class Migrator(object):
             migrate_script_dir = os.path.join(
                     vyos.defaults.directories['migrate'], key)
 
-            while cfg_ver != sys_ver:
-                if cfg_ver < sys_ver:
-                    next_ver = cfg_ver + 1
-                else:
-                    next_ver = cfg_ver - 1
+            while cfg_ver < sys_ver:
+                next_ver = cfg_ver + 1
 
                 migrate_script = os.path.join(migrate_script_dir,
                         '{}-to-{}'.format(cfg_ver, next_ver))
@@ -110,12 +107,17 @@ class Migrator(object):
                                                     os_version_string)
 
     def run(self):
+        """
+        Gather component versions from config file and system.
+        Run migration scripts.
+        Remove old version string from config file, and write new one.
+        """
         cfg_file = self._config_file
 
         cfg_versions = self.get_config_file_versions()
         if self._force:
             # This will force calling all migration scripts.
-            # Nontheless, call get_config_file_versions to set vintage.
+            # Nontheless, call get_config_file_versions to read vintage.
             cfg_versions = {}
 
         sys_versions = systemversions.get_system_versions()
@@ -136,9 +138,8 @@ class VirtualMigrator(Migrator):
 
         cfg_versions = self.get_config_file_versions()
         if not cfg_versions:
-            print("Config file has no version information; virtual "
-                  "migration not possible")
-            sys.exit(0)
+            raise MigratorError("Config file has no version information;"
+                                " virtual migration not possible.")
 
         formatversions.remove_versions(cfg_file)
 
