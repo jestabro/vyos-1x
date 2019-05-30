@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-import vyos.migration_defaults
+import vyos.defaults
 
 def get_system_versions():
     """
@@ -11,8 +11,7 @@ def get_system_versions():
     system_versions = {}
 
     try:
-        version_info = os.listdir(
-                vyos.migration_defaults.vyatta_system_version_dir)
+        version_info = os.listdir(vyos.defaults.directories['current'])
     except OSError as err:
         print("OS error: {}".format(err))
         sys.exit(1)

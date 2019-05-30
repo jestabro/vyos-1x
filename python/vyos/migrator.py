@@ -3,7 +3,7 @@ import os
 import re
 import subprocess
 import vyos.version
-import vyos.migration_defaults
+import vyos.defaults
 import vyos.systemversions as systemversions
 import vyos.formatversions as formatversions
 
@@ -16,7 +16,6 @@ class Migrator(object):
         self._force = force
         self._set_vintage = set_vintage
         self._config_file_vintage = None
-        pass
 
     def get_config_file_versions(self):
         """
@@ -28,13 +27,13 @@ class Migrator(object):
 
         cfg_versions = formatversions.read_vyatta_versions(cfg_file)
 
-        if bool(cfg_versions):
+        if cfg_versions:
             self._config_file_vintage = 'vyatta'
             component_versions = cfg_versions
 
         cfg_versions = formatversions.read_vyos_versions(cfg_file)
 
-        if bool(cfg_versions):
+        if cfg_versions:
             self._config_file_vintage = 'vyos'
             component_versions = cfg_versions
 
@@ -60,7 +59,7 @@ class Migrator(object):
                 cfg_ver = 0
 
             migrate_script_dir = os.path.join(
-                    vyos.migration_defaults.vyatta_migrate_script_dir, key)
+                    vyos.defaults.directories['migrate'], key)
 
             while cfg_ver != sys_ver:
                 if cfg_ver < sys_ver:
@@ -98,7 +97,7 @@ class Migrator(object):
             self._config_file_vintage = self._set_vintage
 
         if not self._config_file_vintage:
-            self._config_file_vintage = vyos.migration_defaults.default_vintage
+            self._config_file_vintage = vyos.defaults.cfg_vintage
 
         if self._config_file_vintage == 'vyatta':
             formatversions.write_vyatta_versions_foot(self._config_file,
@@ -136,7 +135,7 @@ class VirtualMigrator(Migrator):
         cfg_file = self._config_file
 
         cfg_versions = self.get_config_file_versions()
-        if not bool(cfg_versions):
+        if not cfg_versions:
             print("Config file has no version information; virtual "
                   "migration not possible")
             sys.exit(0)
