@@ -84,7 +84,7 @@ class Migrator(object):
 
     def write_config_file_versions(self, cfg_versions):
         """
-        Write new version string.
+        Write new versions string.
         """
         versions_string = formatversions.format_versions_string(cfg_versions)
 
@@ -110,7 +110,7 @@ class Migrator(object):
         """
         Gather component versions from config file and system.
         Run migration scripts.
-        Remove old version string from config file, and write new one.
+        Remove old versions string from config file, and write new one.
         """
         cfg_file = self._config_file
 
