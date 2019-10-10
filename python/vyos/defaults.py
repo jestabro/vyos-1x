@@ -47,3 +47,7 @@ vyos_cert_data = {
     "key": "/etc/ssl/private/vyos-selfsign",
     "lifetime": "365",
 }
+
+le_cert_data = {
+    "conf": "/etc/nginx/snippets/le-cert.conf",
+}

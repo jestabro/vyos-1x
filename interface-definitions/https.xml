@@ -112,6 +112,24 @@
                   </leafNode>
                 </children>
               </node>
+              <node name="letsencrypt-certificate" owner="${vyos_conf_scripts_dir}/le_cert.py">
+                <properties>
+                  <help>Request and use a letsencrypt certificate; domain name is required, email optional</help>
+                </properties>
+                <children>
+                  <leafNode name="domain-name">
+                    <properties>
+                      <help>Domain name(s) for which to obtain certificate</help>
+                      <multi/>
+                    </properties>
+                  </leafNode>
+                  <leafNode name="email">
+                      <properties>
+                          <help>email address to associate with certificate</help>
+                      </properties>
+                  </leafNode>
+                </children>
+              </node>
             </children>
           </node>
         </children>
