@@ -18,7 +18,7 @@ import os
 import subprocess
 import vyos.version
 import vyos.defaults
-import vyos.systemversions as systemversions
+import vyos.component as component
 import vyos.formatversions as formatversions
 
 class MigratorError(Exception):
@@ -183,7 +183,7 @@ class Migrator(object):
             # This will force calling all migration scripts:
             cfg_versions = {}
 
-        sys_versions = systemversions.get_system_versions()
+        sys_versions = component.get_system_versions()
 
         rev_versions = self.run_migration_scripts(cfg_versions, sys_versions)
 

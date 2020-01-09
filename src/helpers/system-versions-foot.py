@@ -16,12 +16,13 @@
 # along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
+
+import vyos.component as component
 import vyos.formatversions as formatversions
-import vyos.systemversions as systemversions
 import vyos.defaults
 import vyos.version
 
-sys_versions = systemversions.get_system_versions()
+sys_versions = component.get_system_versions()
 
 component_string = formatversions.format_versions_string(sys_versions)
 
