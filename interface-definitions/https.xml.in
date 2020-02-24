@@ -31,7 +31,7 @@
               </constraint>
             </properties>
             <children>
-              <leafNode name='listen-port'>
+              <tagNode name='listen-port'>
                 <properties>
                   <help>Port to listen for HTTPS requests; default 443</help>
                   <valueHelp>
@@ -42,13 +42,15 @@
                     <validator name="numeric" argument="--range 1-65535"/>
                   </constraint>
                 </properties>
-              </leafNode>
-              <leafNode name="server-name">
-                <properties>
-                  <help>Server names: exact, wildcard, regex, or '_' (any)</help>
-                  <multi/>
-                </properties>
-              </leafNode>
+                <children>
+                  <leafNode name="server-name">
+                    <properties>
+                      <help>Server names: exact, wildcard, regex, or '_' (any)</help>
+                      <multi/>
+                    </properties>
+                  </leafNode>
+                </children>
+              </tagNode>
             </children>
           </tagNode>
           <node name="api" owner="${vyos_conf_scripts_dir}/http-api.py">
