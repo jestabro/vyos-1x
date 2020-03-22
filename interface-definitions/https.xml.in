@@ -21,7 +21,7 @@
             <children>
               <leafNode name="listen-address">
                 <properties>
-                  <help>Addresses to listen for HTTPS requests</help>
+                  <help>Address to listen for HTTPS requests</help>
                   <valueHelp>
                     <format>ipv4</format>
                    <description>HTTPS IPv4 address</description>
@@ -150,6 +150,155 @@
                           <help>Email address to associate with certificate</help>
                       </properties>
                   </leafNode>
+                </children>
+              </node>
+            </children>
+          </node>
+          <node name="reverse-proxy">
+            <properties>
+              <help>Custom reverse proxy rules</help>
+            </properties>
+            <children>
+              <node name="http">
+                <properties>
+                  <help>Proxy to HTTP/HTTPS server</help>
+                </properties>
+                <children>
+                  <tagNode name="proxy-rule">
+                    <properties>
+                      <help>Reverse proxy rule</help>
+                      <valueHelp>
+                        <format>1-255</format>
+                        <description>Number for this proxy rule</description>
+                      </valueHelp>
+                      <constraint>
+                        <validator name="numeric" argument="--range 1-255"/>
+                      </constraint>
+                    </properties>
+                    <children>
+                      <node name="proxy">
+                        <properties>
+                          <help>Proxy requests through host</help>
+                        </properties>
+                        <children>
+                          <leafNode name="virtual-host">
+                            <properties>
+                              <help>Virtual host name</help>
+                            </properties>
+                          </leafNode>
+                          <leafNode name="path">
+                            <properties>
+                              <help>URI path</help>
+                            </properties>
+                          </leafNode>
+                        </children>
+                      </node>
+                      <node name="origin">
+                        <properties>
+                          <help>Proxy request to origin server or upstream group</help>
+                        </properties>
+                        <children>
+                          <leafNode name="address">
+                            <properties>
+                              <help>Address of origin server</help>
+                              <valueHelp>
+                                <format>ipv4</format>
+                               <description>HTTPS IPv4 address</description>
+                              </valueHelp>
+                              <valueHelp>
+                                <format>ipv6</format>
+                                <description>HTTPS IPv6 address</description>
+                              </valueHelp>
+                            </properties>
+                          </leafNode>
+                          <leafNode name="port">
+                            <properties>
+                              <help>Port on origin server</help>
+                              <valueHelp>
+                                <format>1-65535</format>
+                                <description>Numeric IP port</description>
+                              </valueHelp>
+                              <constraint>
+                                <validator name="numeric" argument="--range 1-65535"/>
+                              </constraint>
+                            </properties>
+                          </leafNode>
+                          <leafNode name="path">
+                            <properties>
+                              <help>URI path on origin server</help>
+                            </properties>
+                          </leafNode>
+                          <node name="upstream">
+                            <properties>
+                              <help>Upstream group of servers</help>
+                            </properties>
+                            <children>
+                              <leafNode name="group">
+                                <properties>
+                                  <help>Group name [REQUIRED]</help>
+                                  <constraint>
+                                    <regex>[a-zA-Z0-9-_]{1,31}</regex>
+                                  </constraint>
+                                  <constraintErrorMessage>illegal characters in group name or length longer than 31 characters</constraintErrorMessage>
+                                </properties>
+                              </leafNode>
+                              <leafNode name="method">
+                                <properties>
+                                  <help>Load-balancing method</help>
+                                  <completionHelp>
+                                    <list>round-robin least-connected ip-hash</list>
+                                  </completionHelp>
+                                  <constraint>
+                                    <regex>(round-robin|least-connected|ip-hash)</regex>
+                                  </constraint>
+                                  <valueHelp>
+                                    <format>round-robin (default)</format>
+                                    <description>round-robin distribution</description>
+                                  </valueHelp>
+                                  <valueHelp>
+                                    <format>least-connected</format>
+                                    <description>(weighted) least-connection scheduling</description>
+                                  </valueHelp>
+                                  <valueHelp>
+                                    <format>ip-hash</format>
+                                    <description>persistent for client IP address</description>
+                                  </valueHelp>
+                                </properties>
+                              </leafNode>
+                              <tagNode name="server">
+                                <properties>
+                                  <help>Server IP address</help>
+                                  <valueHelp>
+                                    <format>ipv4</format>
+                                   <description>HTTPS IPv4 address</description>
+                                  </valueHelp>
+                                  <valueHelp>
+                                    <format>ipv6</format>
+                                    <description>HTTPS IPv6 address</description>
+                                  </valueHelp>
+                                </properties>
+                                <children>
+                                  <leafNode name="weight">
+                                    <properties>
+                                      <help>Weight of server in load-balancing</help>
+                                      <valueHelp>
+                                        <format>1-65535</format>
+                                        <description>Higher weight privileges server</description>
+                                      </valueHelp>
+                                      <constraint>
+                                        <validator name="numeric" argument="--range 1-65535"/>
+                                      </constraint>
+                                      <constraintErrorMessage>Weight must be between 1 and 65535</constraintErrorMessage>
+                                    </properties>
+                                  </leafNode>
+                                </children>
+                              </tagNode>
+                            </children>
+                          </node>
+                        </children>
+                      </node>
+                    </children>
+                  </tagNode>
                 </children>
               </node>
             </children>
