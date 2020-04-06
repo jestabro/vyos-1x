@@ -33,6 +33,9 @@ TRACE_FILE = '/tmp/boot-config-trace'
 
 CFG_GROUP = 'vyattacfg'
 
+# XXX --- True for testing ---
+profile_config = True
+
 trace_config = False
 
 if 'log' in directories:
@@ -50,6 +53,8 @@ try:
     if 'vyos-config-debug' in cmdline:
         os.environ['VYOS_DEBUG'] = 'yes'
         trace_config = True
+    if 'vyos-config-profile' in cmdline:
+        profile_config = True
 except Exception as e:
     print('{0}'.format(e))
 
@@ -109,12 +114,24 @@ def failsafe(config_file_name):
     except subprocess.CalledProcessError as e:
         sys.exit("{0}".format(e))
 
+def profiling_available():
+    if os.path.isfile('/usr/bin/py-spy'):
+        return True
+    return False
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print("Must specify boot config file.")
         sys.exit(1)
     else:
         file_name = sys.argv[1]
+
+    if profile_config and profiling_available():
+        cmd = ['/usr/bin/sudo', 'sudo', '/usr/bin/py-spy', 'record',
+               '--subprocesses', '-o',
+               '/tmp/config-profile-{0:%H%M%S}.svg'.format(datetime.now()),
+               '--pid', '{}'.format(os.getpid())]
+        os.spawnlp(os.P_NOWAIT, *cmd)
 
     # Set user and group options, so that others will be able to commit
     # Currently, the only caller does 'sg CFG_GROUP', but that may change
