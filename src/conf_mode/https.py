@@ -72,21 +72,6 @@ def get_config():
         for block in server_block_list:
             block['vyos_cert'] = vyos_cert_data
 
-    certbot = False
-    certbot_domains = []
-    if conf.exists('certificates certbot domain-name'):
-        certbot_domains = conf.return_values('certificates certbot domain-name')
-    if certbot_domains:
-        certbot = True
-        for domain in certbot_domains:
-            sub_list = vyos.certbot_util.choose_server_block(server_block_list,
-                                                             domain)
-            if sub_list:
-                for sb in sub_list:
-                    sb['certbot'] = True
-                    # certbot organizes certificates by first domain
-                    sb['certbot_dir'] = certbot_domains[0]
-
     api_somewhere = False
     api_data = {}
     if conf.exists('api'):
@@ -110,6 +95,23 @@ def get_config():
             for block in server_block_list:
                 if block['id'] in vhost_list:
                     block['api'] = api_data
+
+    conf.set_level('')
+
+    certbot = False
+    certbot_domains = []
+    if conf.exists('certificate certbot domain-name'):
+        certbot_domains = conf.return_values('certificate certbot domain-name')
+    if certbot_domains:
+        certbot = True
+        for domain in certbot_domains:
+            sub_list = vyos.certbot_util.choose_server_block(server_block_list,
+                                                             domain)
+            if sub_list:
+                for sb in sub_list:
+                    sb['certbot'] = True
+                    # certbot organizes certificates by first domain
+                    sb['certbot_dir'] = certbot_domains[0]
 
     https = {'server_block_list' : server_block_list,
              'api_somewhere': api_somewhere,

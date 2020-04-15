@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!-- HTTPS configuration -->
 <interfaceDefinition>
-  <syntaxVersion component='https' version='2'></syntaxVersion>
+  <syntaxVersion component='https' version='3'></syntaxVersion>
   <node name="service">
     <children>
       <node name="https" owner="${vyos_conf_scripts_dir}/https.py">
@@ -144,24 +144,6 @@
                         <description>Number of days</description>
                       </valueHelp>
                     </properties>
-                  </leafNode>
-                </children>
-              </node>
-              <node name="certbot" owner="${vyos_conf_scripts_dir}/le_cert.py">
-                <properties>
-                  <help>Request or apply a letsencrypt certificate for domain-name</help>
-                </properties>
-                <children>
-                  <leafNode name="domain-name">
-                    <properties>
-                      <help>Domain name(s) for which to obtain certificate</help>
-                      <multi/>
-                    </properties>
-                  </leafNode>
-                  <leafNode name="email">
-                      <properties>
-                          <help>Email address to associate with certificate</help>
-                      </properties>
                   </leafNode>
                 </children>
               </node>
