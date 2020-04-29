@@ -23,13 +23,14 @@ import json
 import traceback
 import threading
 import signal
+import argparse
 
 import vyos.config
 
 from functools import wraps
 
 from flask import Flask, request
-from flask_restx import Api, Resource
+from flask_restx import Api, Resource, fields
 from waitress import serve
 
 from vyos.configsession import ConfigSession, ConfigSessionError
@@ -77,8 +78,21 @@ def auth_required(f):
 
     return decorated_function
 
+configure_fields = api.model('Configure', {
+    'key':  fields.String,
+    'op':   fields.String,
+    'path': fields.List(fields.String)
+})
+
+retrieve_fields = api.model('Retrieve', {
+    'key':  fields.String,
+    'op': fields.String(required=True, enum=['returnValue', 'returnValues']),
+    'path': fields.List(fields.String)
+})
+
 @api.route('/configure')
 class Configure(Resource):
+    @api.expect(configure_fields)
     @auth_required
     def post(self):
         session = app.config['vyos_session']
@@ -190,6 +204,7 @@ class Configure(Resource):
 
 @api.route('/retrieve')
 class Retrieve(Resource):
+    @api.expect(retrieve_fields)
     @auth_required
     def post(self):
         session = app.config['vyos_session']
@@ -389,6 +404,16 @@ def shutdown():
     raise KeyboardInterrupt
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--oas', action='store_true',
+                        help="Show openapi specification.")
+    args = parser.parse_args()
+
+    if args.oas:
+        with app.test_request_context():
+            print(json.dumps(api.__schema__))
+        sys.exit(0)
+
     # systemd's user and group options don't work, do it by hand here,
     # else no one else will be able to commit
     cfg_group = grp.getgrnam(CFG_GROUP)
