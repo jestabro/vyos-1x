@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+#
+# Copyright (C) 2020 VyOS maintainers and contributors
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or later as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+
+import os
+import sys
+import re
+import json
+import zmq
+
+from vyos.config import Config
+from vyos.frozen_config import FrozenConfig
+from vyos import ConfigError
+
+SOCKET_PATH = "ipc:///run/vyos-configd.sock"
+
+vyos_conf_scripts_dir = '/usr/libexec/vyos/conf_mode'
+
+active_string = ''
+session_string = ''
+
+# import conf_mode scripts
+# single example for testing
+imports = ['interfaces_dummy']
+modules = []
+
+# This is not ideal; prefer importlib (nee imp)
+# However, the import must be explicit, so that the name can be referenced;
+# confirm how to export name with importlib ...
+sys.path.append(vyos_conf_scripts_dir)
+for x in imports:
+    modules.append(__import__(x))
+
+conf_mode_scripts = dict(zip(imports, modules))
+
+def run_script(script, config):
+    config.set_level([])
+    try:
+        c = script.get_config(config)
+        script.verify(c)
+        script.generate(c)
+        script.apply(c)
+    except ConfigError as e:
+        print(e)
+
+def initialization(socket):
+    # zmq synchronous for ipc from single client:
+    active_string = socket.recv().decode()
+    resp = "active"
+    socket.send(resp.encode())
+    session_string = socket.recv().decode()
+    resp = "session"
+    socket.send(resp.encode())
+
+    config = FrozenConfig(running_config_text = active_string,
+                          session_config_text = session_string)
+
+    return config
+
+def process_node_data(socket, config, message):
+    res = re.match(r'^.+\/([^/].+).py(VYOS_TAGNODE_VALUE=.+)?', message)
+    if res.group(1):
+        script_name = res.group(1)
+    if res.group(2):
+        env = res.group(2).split('=')
+        os.environ[env[0]] = env[1]
+
+    run_script(conf_mode_scripts[script_name], config)
+
+if __name__ == '__main__':
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)
+
+    # Set the right permissions on the socket, then change it back
+    o_mask = os.umask(0)
+    socket.bind(SOCKET_PATH)
+    os.umask(o_mask)
+
+    config = None
+
+    while True:
+        #  Wait for next request from client
+        message = socket.recv().decode()
+
+        if message == "init":
+            resp = "init"
+            socket.send(resp.encode())
+            config = initialization(socket)
+        else:
+            process_node_data(socket, config, message)
+            resp = "data"
+            socket.send(resp.encode())
+

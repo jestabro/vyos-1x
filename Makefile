@@ -2,6 +2,8 @@ TMPL_DIR := templates-cfg
 OP_TMPL_DIR := templates-op
 BUILD_DIR := build
 DATA_DIR := data
+CC := gcc
+LIBS := -lzmq
 CFLAGS :=
 
 src = $(wildcard interface-definitions/*.xml.in)
@@ -108,8 +110,13 @@ op_mode_definitions:
 component_versions: $(BUILD_DIR) $(obj)
 	$(CURDIR)/scripts/build-component-versions $(BUILD_DIR)/interface-definitions $(DATA_DIR)
 
+.PHONY: vyshim
+.ONESHELL:
+vyshim: vyshim.c
+	$(CC) -o $@ $< $(LIBS)
+
 .PHONY: all
-all: clean interface_definitions op_mode_definitions component_versions
+all: clean interface_definitions op_mode_definitions component_versions vyshim
 
 .PHONY: clean
 clean:

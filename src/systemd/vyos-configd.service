@@ -1,0 +1,30 @@
+[Unit]
+Description=VyOS configuration daemon
+
+# Without this option, lots of default dependencies are added,
+# among them network.target, which creates a dependency cycle
+DefaultDependencies=no
+
+# Seemingly sensible way to say "as early as the system is ready"
+# All vyos-configd needs is read/write mounted root
+After=systemd-remount-fs.service
+
+[Service]
+ExecStart=/usr/bin/python3 -u /usr/libexec/vyos/services/vyos-configd
+Type=idle
+
+SyslogIdentifier=vyos-configd
+SyslogFacility=daemon
+
+Restart=on-failure
+
+# Does't work in Jessie but leave it here
+User=root
+Group=vyattacfg
+
+[Install]
+
+# Note: After= doesn't actually create a dependency,
+# it just sets order for the case when both services are to start,
+# and without RequiredBy it *does not* set vyos-hostsd to start.
+RequiredBy=vyos-router.service

@@ -22,10 +22,11 @@ from vyos.version import get_version
 from vyos.version import get_full_version_data
 
 
-def enable(log=True):
-    if log:
-        _intercepting_logger()
-    _intercepting_exceptions()
+def enable(enable=False, log=False):
+    if enable:
+        if log:
+            _intercepting_logger()
+        _intercepting_exceptions()
 
 
 _noteworthy = []
