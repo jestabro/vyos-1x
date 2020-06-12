@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <zmq.h>
+#include "mkjson.h"
 
 /*
  * There is at least one unsafe practice here, but poc wip.
