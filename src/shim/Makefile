@@ -1,4 +1,4 @@
-CC := gcc
+CC := gcc -DDEBUG
 CFLAGS := -I./mkjson -L./mkjson/lib
 LIBS := -lmkjson -lzmq
 

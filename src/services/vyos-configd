@@ -21,10 +21,24 @@ import sys
 import re
 import json
 import zmq
+import logging
 
 from vyos.config import Config
 from vyos.frozen_config import FrozenConfig
 from vyos import ConfigError
+
+debug = True
+
+# Configure logging
+logger = logging.getLogger(__name__)
+# set stream as output
+logs_handler = logging.StreamHandler()
+logger.addHandler(logs_handler)
+
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
 
 SOCKET_PATH = "ipc:///run/vyos-configd.sock"
 
@@ -58,6 +72,9 @@ def run_script(script, config):
         print(e)
 
 def initialization(socket):
+    # Reset config strings:
+    active_string = ''
+    session_string = ''
     # zmq synchronous for ipc from single client:
     active_string = socket.recv().decode()
     resp = "active"
@@ -71,8 +88,12 @@ def initialization(socket):
 
     return config
 
-def process_node_data(socket, config, message):
-    res = re.match(r'^.+\/([^/].+).py(VYOS_TAGNODE_VALUE=.+)?', message)
+def process_node_data(socket, config, data):
+    if not config:
+        logging.critical(f"Empty config")
+        return
+
+    res = re.match(r'^.+\/([^/].+).py(VYOS_TAGNODE_VALUE=.+)?', data)
     if res.group(1):
         script_name = res.group(1)
     if res.group(2):
@@ -94,14 +115,18 @@ if __name__ == '__main__':
 
     while True:
         #  Wait for next request from client
-        message = socket.recv().decode()
+        msg = socket.recv().decode()
+        logging.debug(f"Received message: {msg}")
+        message = json.loads(msg)
 
-        if message == "init":
+        if message["type"] == "init":
             resp = "init"
             socket.send(resp.encode())
             config = initialization(socket)
-        else:
-            process_node_data(socket, config, message)
-            resp = "data"
+        elif message["type"] == "node":
+            process_node_data(socket, config, message["data"])
+            resp = "node"
             socket.send(resp.encode())
+        else:
+            logger.critical(f"Unexpected message: {message}")
 

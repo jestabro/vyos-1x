@@ -10,10 +10,17 @@
  *
  */
 
+#ifdef DEBUG
+#define DEBUG_ON 1
+#else
+#define DEBUG_ON 0
+#endif
+#define debug_print(fmt, ...) \
+    do { if (DEBUG_ON) fprintf(stderr, fmt, ##__VA_ARGS__); } while (0)
+
 #define SOCKET_PATH "ipc:///run/vyos-configd.sock"
 
 #define GET_ACTIVE "cli-shell-api --show-active-only --show-show-defaults --show-ignore-edit showConfig"
-
 #define GET_SESSION "cli-shell-api --show-working-only --show-show-defaults --show-ignore-edit showConfig"
 
 #define COMMIT_MARKER "/var/tmp/initial_in_commit"
@@ -29,7 +36,7 @@ int main(int argc, char* argv[])
     void *context = zmq_ctx_new();
     void *requester = zmq_socket(context, ZMQ_REQ);
 
-    printf("Connecting to vyos-configd ...\n");
+    debug_print("Connecting to vyos-configd ...\n");
     zmq_connect(requester, SOCKET_PATH);
 
     if (access(COMMIT_MARKER, F_OK) != -1) {
@@ -44,10 +51,16 @@ int main(int argc, char* argv[])
     }
 
     char buffer[16];
-    printf("Sending node data ...\n");
-    zmq_send(requester, string_node_data, strlen(string_node_data), 0);
+    debug_print("Sending node data ...\n");
+    char *string_node_data_msg = mkjson(MKJSON_OBJ, 2,
+                                        MKJSON_STRING, "type", "node",
+                                        MKJSON_STRING, "data", &string_node_data[0]);
+
+    zmq_send(requester, string_node_data_msg, strlen(string_node_data_msg), 0);
     zmq_recv(requester, buffer, 16, 0);
-    printf("Received\n");
+    debug_print("Received node data receipt\n");
+
+    free(string_node_data_msg);
 
     zmq_close(requester);
     zmq_ctx_destroy(context);
@@ -64,28 +77,32 @@ int initialization(void* Requester)
 
     char buffer[16];
 
-    printf("Sending init announcement\n");
-    zmq_send(Requester, "init", 4, 0);
+    debug_print("Sending init announcement\n");
+    char *init_announce = mkjson(MKJSON_OBJ, 1,
+                                 MKJSON_STRING, "type", "init");
+    zmq_send(Requester, init_announce, strlen(init_announce), 0);
     zmq_recv(Requester, buffer, 16, 0);
-    printf("Received init\n");
+    debug_print("Received init receipt\n");
+
+    free(init_announce);
 
     FILE *fp_a = popen(GET_ACTIVE, "r");
     getdelim(&active_str, &active_len, '\0', fp_a);
 
-    printf("Sending active config\n");
+    debug_print("Sending active config\n");
     zmq_send(Requester, active_str, active_len - 1, 0);
     zmq_recv(Requester, buffer, 16, 0);
-    printf("Received active receipt\n");
+    debug_print("Received active receipt\n");
 
     free(active_str);
 
     FILE *fp_s = popen(GET_SESSION, "r");
     getdelim(&session_str, &session_len, '\0', fp_s);
 
-    printf("Sending session config\n");
+    debug_print("Sending session config\n");
     zmq_send(Requester, session_str, session_len - 1, 0);
     zmq_recv(Requester, buffer, 16, 0);
-    printf("Received session receipt\n");
+    debug_print("Received session receipt\n");
 
     free(session_str);
 
