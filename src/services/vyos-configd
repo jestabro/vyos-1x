@@ -93,12 +93,18 @@ def process_node_data(socket, config, data):
         logger.critical(f"Empty config")
         return
 
+    script_name = None
+
     res = re.match(r'^.+\/([^/].+).py(VYOS_TAGNODE_VALUE=.+)?', data)
     if res.group(1):
         script_name = res.group(1)
     if res.group(2):
         env = res.group(2).split('=')
         os.environ[env[0]] = env[1]
+
+    if not script_name:
+        logger.critical(f"Missing script_name")
+        return
 
     run_script(conf_mode_scripts[script_name], config)
 
