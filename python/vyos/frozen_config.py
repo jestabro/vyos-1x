@@ -102,11 +102,17 @@ class FrozenConfig(object):
         else:
             self.__session_env = None
         if running_config_text:
-            self._running_config = vyos.configtree.ConfigTree(running_config_text)
+            try:
+                self._running_config = vyos.configtree.ConfigTree(running_config_text)
+            except ValueError:
+                self._running_config = None
         else:
             self._running_config = None
         if session_config_text:
-            self._session_config = vyos.configtree.ConfigTree(session_config_text)
+            try:
+                self._session_config = vyos.configtree.ConfigTree(session_config_text)
+            except ValueError:
+                self._session_config = None
         else:
             self._session_config = None
 

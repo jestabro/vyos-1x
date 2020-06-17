@@ -90,7 +90,7 @@ def initialization(socket):
 
 def process_node_data(socket, config, data):
     if not config:
-        logging.critical(f"Empty config")
+        logger.critical(f"Empty config")
         return
 
     res = re.match(r'^.+\/([^/].+).py(VYOS_TAGNODE_VALUE=.+)?', data)
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     while True:
         #  Wait for next request from client
         msg = socket.recv().decode()
-        logging.debug(f"Received message: {msg}")
+        logger.debug(f"Received message: {msg}")
         message = json.loads(msg)
 
         if message["type"] == "init":
