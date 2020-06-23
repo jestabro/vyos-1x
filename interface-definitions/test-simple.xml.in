@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- HTTPS configuration -->
+<interfaceDefinition>
+  <node name="test-simple" owner="${vyos_conf_scripts_dir}/test_simple.py">
+    <properties>
+      <help>Test area</help>
+    </properties>
+    <children>
+      <leafNode name="something">
+        <properties>
+          <valueless/>
+        </properties>
+      </leafNode>
+    </children>
+  </node>
+</interfaceDefinition>
