@@ -22,6 +22,7 @@ import re
 import json
 import zmq
 import logging
+import importlib.util
 
 from vyos.config import Config
 from vyos.frozen_config import FrozenConfig
@@ -49,15 +50,21 @@ session_string = ''
 
 # import conf_mode scripts
 # single example for testing
-imports = ['interfaces_dummy']
+files = ['interfaces-dummy.py']
+imports = [os.path.splitext(i)[0] for i in files]
+# canonicalize name for loading; we will use 'imports' (previous line)
+# for dict keys, however, so as to pass them directly from the node defs
+# This is not strictly necessary to load the module, but proper:
+module_names = [i.replace('-', '_') for i in imports]
+to_load = list(zip(module_names, files))
+
 modules = []
 
-# This is not ideal; prefer importlib (nee imp)
-# However, the import must be explicit, so that the name can be referenced;
-# confirm how to export name with importlib ...
-sys.path.append(vyos_conf_scripts_dir)
-for x in imports:
-    modules.append(__import__(x))
+for x in to_load:
+    spec = importlib.util.spec_from_file_location(x[0], vyos_conf_scripts_dir + '/' + x[1])
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    modules.append(module)
 
 conf_mode_scripts = dict(zip(imports, modules))
 
