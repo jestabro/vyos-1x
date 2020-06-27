@@ -15,4 +15,4 @@ all: vyshim
 .PHONY: clean
 clean:
 	$(MAKE) -C mkjson clean
-	rm -rf vyshim
+	rm -f vyshim

@@ -15,9 +15,8 @@ all: clean force
 
 #Normal cleanup
 clean:
-	-rm -r obj
-	-rm -r lib
-	-rm example
+	-rm -rf obj
+	-rm -rf lib
 
 #Environment init
 force:
