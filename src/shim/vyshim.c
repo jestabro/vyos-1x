@@ -25,6 +25,14 @@
 
 #define COMMIT_MARKER "/var/tmp/initial_in_commit"
 
+enum {
+    SUCCESS =      1 << 0,
+    ERROR_COMMIT = 1 << 1,
+    ERROR_DAEMON = 1 << 2,
+    PASS =         1 << 3
+};
+
+
 int initialization(void *);
 
 int main(int argc, char* argv[])
@@ -50,20 +58,33 @@ int main(int argc, char* argv[])
         strncat(&string_node_data[0], argv[i], 127);
     }
 
-    char buffer[16];
+    char error_code[1];
     debug_print("Sending node data ...\n");
     char *string_node_data_msg = mkjson(MKJSON_OBJ, 2,
                                         MKJSON_STRING, "type", "node",
                                         MKJSON_STRING, "data", &string_node_data[0]);
 
     zmq_send(requester, string_node_data_msg, strlen(string_node_data_msg), 0);
-    zmq_recv(requester, buffer, 16, 0);
+    zmq_recv(requester, error_code, 1, 0);
     debug_print("Received node data receipt\n");
+
+    int err = (int)error_code[0];
 
     free(string_node_data_msg);
 
     zmq_close(requester);
     zmq_ctx_destroy(context);
+
+    if (err & ERROR_COMMIT) {
+        debug_print("Received ERROR_COMMIT\n");
+        return -1;
+    }
+
+    if (err & ERROR_DAEMON) {
+        debug_print("Received ERROR_DAEMON\n");
+        return -1;
+    }
+
     return 0;
 }
 

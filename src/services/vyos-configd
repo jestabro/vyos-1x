@@ -20,11 +20,10 @@ import os
 import sys
 import re
 import json
-import zmq
 import logging
 import importlib.util
+import zmq
 
-from vyos.config import Config
 from vyos.frozen_config import FrozenConfig
 from vyos import ConfigError
 
@@ -43,6 +42,12 @@ else:
 
 SOCKET_PATH = "ipc:///run/vyos-configd.sock"
 
+# Response error codes consistent with vyshim
+R_SUCCESS = 1
+R_ERROR_COMMIT = 2
+R_ERROR_DAEMON = 4
+R_PASS = 8
+
 vyos_conf_scripts_dir = '/usr/libexec/vyos/conf_mode'
 
 active_string = ''
@@ -50,7 +55,7 @@ session_string = ''
 
 # import conf_mode scripts
 # single example for testing
-files = ['interfaces-dummy.py']
+files = ['interfaces-dummy.py', 'test_simple.py']
 imports = [os.path.splitext(i)[0] for i in files]
 # canonicalize name for loading; we will use 'imports' (previous line)
 # for dict keys, however, so as to pass them directly from the node defs
@@ -68,7 +73,7 @@ for x in to_load:
 
 conf_mode_scripts = dict(zip(imports, modules))
 
-def run_script(script, config):
+def run_script(script, config) -> int:
     config.set_level([])
     try:
         c = script.get_config(config)
@@ -76,7 +81,10 @@ def run_script(script, config):
         script.generate(c)
         script.apply(c)
     except ConfigError as e:
-        print(e)
+        logger.critical(e)
+        return R_ERROR_COMMIT
+
+    return R_SUCCESS
 
 def initialization(socket):
     # Reset config strings:
@@ -90,15 +98,15 @@ def initialization(socket):
     resp = "session"
     socket.send(resp.encode())
 
-    config = FrozenConfig(running_config_text = active_string,
-                          session_config_text = session_string)
+    config = FrozenConfig(running_config_text=active_string,
+                          session_config_text=session_string)
 
     return config
 
-def process_node_data(socket, config, data):
+def process_node_data(socket, config, data) -> int:
     if not config:
         logger.critical(f"Empty config")
-        return
+        return R_ERROR_DAEMON
 
     script_name = None
 
@@ -111,9 +119,11 @@ def process_node_data(socket, config, data):
 
     if not script_name:
         logger.critical(f"Missing script_name")
-        return
+        return R_ERROR_DAEMON
 
-    run_script(conf_mode_scripts[script_name], config)
+    result = run_script(conf_mode_scripts[script_name], config)
+
+    return result
 
 if __name__ == '__main__':
     context = zmq.Context()
@@ -137,9 +147,8 @@ if __name__ == '__main__':
             socket.send(resp.encode())
             config = initialization(socket)
         elif message["type"] == "node":
-            process_node_data(socket, config, message["data"])
-            resp = "node"
-            socket.send(resp.encode())
+            res = process_node_data(socket, config, message["data"])
+            response = res.to_bytes(1, byteorder=sys.byteorder)
+            socket.send(response)
         else:
             logger.critical(f"Unexpected message: {message}")
-
