@@ -74,6 +74,7 @@ import re
 import json
 import subprocess
 
+import vyos.util
 import vyos.configtree
 
 
@@ -192,7 +193,7 @@ class FrozenConfig(object):
                 # node doesn't exist at all
                 return False
 
-    def get_config_dict(self, path=[], effective=False):
+    def get_config_dict(self, path=[], effective=False, key_mangling=None):
         """
         Args: path (str list): Configuration tree path, can be empty
         Returns: a dict representation of the config
@@ -210,6 +211,15 @@ class FrozenConfig(object):
             if self._session_config:
                 if not path or self._session_config.exists(self._make_path(path)):
                     config_dict = json.loads((self._session_config).to_json())
+
+        if key_mangling:
+            if not (isinstance(key_mangling, tuple) and \
+                    (len(key_mangling) == 2) and \
+                    isinstance(key_mangling[0], str) and \
+                    isinstance(key_mangling[1], str)):
+                raise ValueError("key_mangling must be a tuple of two strings")
+            else:
+                config_dict = vyos.util.mangle_dict_keys(config_dict, key_mangling[0], key_mangling[1])
 
         return config_dict
 

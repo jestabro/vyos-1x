@@ -21,8 +21,11 @@ from vyos.config import Config
 from vyos.configdict import list_diff
 from vyos import ConfigError
 
-def get_config():
-    conf = Config()
+def get_config(config=None):
+    if config:
+        conf = config
+    else:
+        conf = Config()
     if not conf.exists('test-simple'):
         return None
 
