@@ -2,11 +2,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <zmq.h>
 #include "mkjson.h"
 
 /*
- * There is at least one unsafe practice here, but poc wip.
+ *
  *
  */
 
@@ -34,6 +36,7 @@ enum {
 
 
 int initialization(void *);
+int pass_through(char **, int);
 
 int main(int argc, char* argv[])
 {
@@ -52,9 +55,9 @@ int main(int argc, char* argv[])
         initialization(requester);
     }
 
-    int len = argc > 3 ? 3 : argc - 1;
+    int end = argc > 3 ? 3 : argc - 1;
 
-    for (int i = len; i > 0 ; i--) {
+    for (int i = end; i > 0 ; i--) {
         strncat(&string_node_data[0], argv[i], 127);
     }
 
@@ -74,6 +77,12 @@ int main(int argc, char* argv[])
 
     zmq_close(requester);
     zmq_ctx_destroy(context);
+
+    if (err & PASS) {
+        debug_print("Received PASS\n");
+        int ret = pass_through(argv, end);
+        return ret;
+    }
 
     if (err & ERROR_COMMIT) {
         debug_print("Received ERROR_COMMIT\n");
@@ -129,6 +138,42 @@ int initialization(void* Requester)
 
     pclose(fp_a);
     pclose(fp_s);
+
+    return 0;
+}
+
+int pass_through(char **argv, int end)
+{
+    char *newargv[] = { NULL, NULL };
+    pid_t child_pid;
+
+    newargv[0] = argv[end];
+    if (end > 1) {
+        putenv(argv[end - 1]);
+    }
+
+    if ((child_pid=fork()) < 0) {
+        debug_print("fork() failed\n");
+        return -1;
+    } else if (child_pid == 0) {
+        if (-1 == execv(argv[end], newargv)) {
+            debug_print("pass_through execve failed %s: %s\n",
+                        argv[end], strerror(errno));
+            return -1;
+        }
+    } else if (child_pid > 0) {
+        int status;
+        pid_t wait_pid = waitpid(child_pid, &status, 0);
+         if (wait_pid < 0) {
+             debug_print("waitpid() failed\n");
+             return -1;
+         } else if (wait_pid == child_pid) {
+             if (WIFEXITED(status)) {
+                 debug_print("child exited with code %d\n",
+                             WEXITSTATUS(status));
+             }
+         }
+    }
 
     return 0;
 }

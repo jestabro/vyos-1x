@@ -53,6 +53,8 @@ vyos_conf_scripts_dir = '/usr/libexec/vyos/conf_mode'
 active_string = ''
 session_string = ''
 
+exclude = []
+
 # import conf_mode scripts
 # single example for testing
 files = ['interfaces-dummy.py', 'test_simple.py']
@@ -116,6 +118,9 @@ def process_node_data(socket, config, data) -> int:
     if res.group(2):
         env = res.group(2).split('=')
         os.environ[env[0]] = env[1]
+
+    if script_name in exclude:
+        return R_PASS
 
     if not script_name:
         logger.critical(f"Missing script_name")
