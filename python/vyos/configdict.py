@@ -104,27 +104,29 @@ def dict_merge(source, destination):
 def _get_sub_dict(d, path):
     k = path[0]
     if k not in d.keys():
-        return None
+        return {}
     c = {k: d[k]}
     path = path[1:]
     if not path:
         return c
     elif not isinstance(c[k], dict):
-        return None
+        return {}
     return _get_sub_dict(c[k], path)
 
 def get_sub_dict(odict, path):
     """ Return sub-dictionary of dictionary, defined by path of keys.
     The return value is {key : odict[key]} for key := the last element in path.
-    None is returned for nonesensical input or unreachable paths. """
+    None is returned for non-dict input, {} for unreachable paths. """
+    if not isinstance(odict, dict):
+        return None
     if isinstance(path, str):
         path = path.split()
     elif isinstance(path, list):
         pass
     else:
         raise TypeError("Path must be a whitespace-separated string or a list")
-    if not path or not isinstance(odict, dict):
-        return None
+    if not path:
+        return odict
     return _get_sub_dict(odict, path)
 
 def list_diff(first, second):
