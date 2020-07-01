@@ -364,6 +364,40 @@ def mangle_dict_keys(data, regex, replacement):
 
     return new_dict
 
+def _get_sub_dict(d, path):
+    k = path[0]
+    if k not in d.keys():
+        return {}
+    c = {k: d[k]}
+    path = path[1:]
+    if not path:
+        return c
+    elif not isinstance(c[k], dict):
+        return {}
+    return _get_sub_dict(c[k], path)
+
+def get_sub_dict(source, path):
+    """ Returns the sub-dict of a nested dict, defined by path of keys.
+
+    Args:
+        source (dict): Source dict to extract from
+        path (str or list[str]): sequence of keys
+
+    Returns: {key : source[..]..[key]} for key the last element of path, if exists
+             {} otherwise
+    """
+    if not isinstance(source, dict):
+        raise TypeError("Source must be of type dict")
+    if isinstance(path, str):
+        path = path.split()
+    elif isinstance(path, list):
+        pass
+    else:
+        raise TypeError("Path must be a whitespace-separated string or a list")
+    if not path:
+        return source
+    return _get_sub_dict(source, path)
+
 def process_running(pid_file):
     """ Checks if a process with PID in pid_file is running """
     from psutil import pid_exists
