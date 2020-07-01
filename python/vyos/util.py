@@ -364,39 +364,35 @@ def mangle_dict_keys(data, regex, replacement):
 
     return new_dict
 
-def _get_sub_dict(d, path):
-    k = path[0]
+def _get_sub_dict(d, lpath):
+    k = lpath[0]
     if k not in d.keys():
         return {}
     c = {k: d[k]}
-    path = path[1:]
-    if not path:
+    lpath = lpath[1:]
+    if not lpath:
         return c
     elif not isinstance(c[k], dict):
         return {}
-    return _get_sub_dict(c[k], path)
+    return _get_sub_dict(c[k], lpath)
 
-def get_sub_dict(source, path):
+def get_sub_dict(source, lpath):
     """ Returns the sub-dict of a nested dict, defined by path of keys.
 
     Args:
         source (dict): Source dict to extract from
-        path (str or list[str]): sequence of keys
+        lpath (list[str]): sequence of keys
 
-    Returns: {key : source[..]..[key]} for key the last element of path, if exists
+    Returns: {key : source[..]..[key]} for key the last element of lpath, if exists
              {} otherwise
     """
     if not isinstance(source, dict):
-        raise TypeError("Source must be of type dict")
-    if isinstance(path, str):
-        path = path.split()
-    elif isinstance(path, list):
-        pass
-    else:
-        raise TypeError("Path must be a whitespace-separated string or a list")
-    if not path:
+        raise TypeError("source must be of type dict")
+    if not isinstance(lpath, list):
+        raise TypeError("path must be of type list")
+    if not lpath:
         return source
-    return _get_sub_dict(source, path)
+    return _get_sub_dict(source, lpath)
 
 def process_running(pid_file):
     """ Checks if a process with PID in pid_file is running """

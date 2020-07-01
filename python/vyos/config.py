@@ -70,7 +70,6 @@ import subprocess
 
 import vyos.util
 import vyos.configtree
-from vyos.configdict import get_sub_dict
 
 class VyOSError(Exception):
     """
@@ -311,7 +310,7 @@ class Config(object):
 
         return config_dict
 
-    def get_config_dict(self, path=[], effective=False, key_mangling=None, skip_first_key=False):
+    def get_config_dict(self, path=[], effective=False, key_mangling=None, get_first_key=False):
         """
         Args: path (str list): Configuration tree path, can be empty
         Returns: a dict representation of the config
@@ -323,8 +322,8 @@ class Config(object):
         else:
             config_tree = vyos.configtree.ConfigTree(res)
             config_dict = json.loads(config_tree.to_json())
-            config_dict = vyos.util.get_sub_dict(config_dict, path)
-            if skip_first_key:
+            config_dict = vyos.util.get_sub_dict(config_dict, self._make_path(path))
+            if get_first_key:
                 tmp = next(iter(config_dict.values()))
                 if not isinstance(tmp, dict):
                     raise TypeError("Data under node is not of type dict")
