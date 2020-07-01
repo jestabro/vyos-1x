@@ -288,7 +288,7 @@ class Config(object):
             self.__session_env = save_env
             return(default)
 
-    def get_config_dict(self, path=[], effective=False, key_mangling=None):
+    def o_get_config_dict(self, path=[], effective=False, key_mangling=None):
         """
         Args: path (str list): Configuration tree path, can be empty
         Returns: a dict representation of the config
@@ -311,7 +311,7 @@ class Config(object):
 
         return config_dict
 
-    def m_get_config_dict(self, path=[], effective=False, key_mangling=None, skip_first_key=False):
+    def get_config_dict(self, path=[], effective=False, key_mangling=None, skip_first_key=False):
         """
         Args: path (str list): Configuration tree path, can be empty
         Returns: a dict representation of the config
