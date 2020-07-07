@@ -16,13 +16,18 @@
 """
 """
 
-#import vyos.config
-from vyos.util import get_sub_dict
+from vyos.config import Config
+from vyos.util import get_sub_dict, mangle_dict_keys
 
 class ConfigDiffError(Exception):
     """
     """
     pass
+
+def get_config_diff(config):
+    if not config or not isinstance(config, Config):
+        raise TypeError("argument must me a Config instance")
+    return ConfigDiff(config)
 
 def _key_sets_from_dicts(session_dict, effective_dict):
     session_keys = list(session_dict)
@@ -34,12 +39,22 @@ def _key_sets_from_dicts(session_dict, effective_dict):
 
     return added_keys, deleted_keys, stable_keys
 
-# This will always be applied to a key_set obtained from a get_sub_dict,
-# hence there is no possibility of KeyError, as get_sub_dict guarantees
-# a return type of dict
 def _dict_from_key_set(d, key_set):
+    # This will always be applied to a key_set obtained from a get_sub_dict,
+    # hence there is no possibility of KeyError, as get_sub_dict guarantees
+    # a return type of dict
     ret = {k: d[k] for k in key_set}
     return ret
+
+def _mangle_dict_keys(d, key_mangling):
+    if not (isinstance(key_mangling, tuple) and \
+            (len(key_mangling) == 2) and \
+            isinstance(key_mangling[0], str) and \
+            isinstance(key_mangling[1], str)):
+        raise ValueError("key_mangling must be a tuple of two strings")
+    else:
+        d = mangle_dict_keys(d, key_mangling[0], key_mangling[1])
+        return d
 
 class ConfigDiff(object):
     """
@@ -66,8 +81,8 @@ class ConfigDiff(object):
         Set the *edit level*, that is, a relative config dict path.
         Once set, all operations will be relative to this path,
         for example, after ``set_level("system")``, calling
-        ``get_value_changed("name-server")`` is equivalent to calling
-        ``get_value_changed("system name-server")`` without ``set_level``.
+        ``get_value("name-server")`` is equivalent to calling
+        ``get_value("system name-server")`` without ``set_level``.
 
         Args:
             path (str|list): relative config path
@@ -92,7 +107,7 @@ class ConfigDiff(object):
         ret = self._level.copy()
         return ret
 
-    def get_child_nodes_changed(self, path=[], return_as_dict=False):
+    def get_child_nodes_changed(self, path=[], return_as_dict=False, key_mangling=None):
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path), get_first_key=True)
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path), get_first_key=True)
 
@@ -103,9 +118,13 @@ class ConfigDiff(object):
 
         added_dict = _dict_from_key_set(session_dict, added_keys)
         deleted_dict = _dict_from_key_set(effective_dict, deleted_keys)
+        if key_mangling:
+            added_dict = _mangle_dict_keys(added_dict, key_mangling)
+            deleted_dict = _mangle_dict_keys(deleted_dict, key_mangling)
+
         return added_dict, deleted_dict
 
-    def get_child_nodes_unchanged(self, path=[], return_as_dict=False):
+    def get_child_nodes_unchanged(self, path=[], return_as_dict=False, key_mangling=None):
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path), get_first_key=True)
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path), get_first_key=True)
 
@@ -115,9 +134,12 @@ class ConfigDiff(object):
             return stable_keys
 
         stable_dict = _dict_from_key_set(session_dict, stable_keys)
+        if key_mangling:
+            stable_dict = _mangle_dict_keys(stable_dict, key_mangling)
+
         return stable_dict
 
-    def get_node_changed(self, path=[], return_as_dict=False):
+    def get_node_changed(self, path=[], return_as_dict=False, key_mangling=None):
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
 
@@ -127,9 +149,13 @@ class ConfigDiff(object):
 
         added_dict = _dict_from_key_set(session_dict, added_key)
         deleted_dict = _dict_from_key_set(effective_dict, deleted_key)
+        if key_mangling:
+            added_dict = _mangle_dict_keys(added_dict, key_mangling)
+            deleted_dict = _mangle_dict_keys(deleted_dict, key_mangling)
+
         return added_dict, deleted_dict
 
-    def get_node_unchanged(self, path=[], return_as_dict=False):
+    def get_node_unchanged(self, path=[], return_as_dict=False, key_mangling=None):
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
 
@@ -139,11 +165,14 @@ class ConfigDiff(object):
             return stable_key
 
         stable_dict = _dict_from_key_set(session_dict, stable_key)
+        if key_mangling:
+            stable_dict = _mangle_dict_keys(stable_dict, key_mangling)
+
         return stable_dict
 
-    def get_value_changed(self, path=[]):
+    def get_value(self, path=[]):
         # one should properly use is_leaf as check; for the moment we will
-        # deduce from type, but will not catch call on non-leaf node if None
+        # deduce from type, which will not catch call on non-leaf node if None
         new_value_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         old_value_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
 
@@ -160,3 +189,16 @@ class ConfigDiff(object):
             raise ConfigDiffError("get_value_changed called on non-leaf node")
 
         return new_value, old_value
+
+    # general purpose; same form as Config.get_config_dict
+    def get_config_dict(self, path=[], effective=False, key_mangling=None, get_first_key=False):
+        if effective:
+            config_dict = self._effective_config_dict
+        else:
+            config_dict = self._session_config_dict
+
+        config_dict = get_sub_dict(config_dict, self._make_path(path), get_first_key)
+        if key_mangling:
+            config_dict = _mangle_dict_keys(config_dict, key_mangling)
+
+        return config_dict
