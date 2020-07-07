@@ -139,6 +139,12 @@ class ConfigDiff(object):
 
         return stable_dict
 
+    def child_nodes_changed(self, path=[]):
+        a, b = self.get_child_nodes_changed(path)
+        if not a and not b:
+            return False
+        return True
+
     def get_node_changed(self, path=[], return_as_dict=False, key_mangling=None):
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
@@ -170,6 +176,18 @@ class ConfigDiff(object):
 
         return stable_dict
 
+    def node_added(self, path=[]):
+        a, _ = self.get_node_changed(path)
+        if not a:
+            return False
+        return True
+
+    def node_deleted(self, path=[]):
+        _, b = self.get_node_changed(path)
+        if not b:
+            return False
+        return True
+
     def get_value(self, path=[]):
         # one should properly use is_leaf as check; for the moment we will
         # deduce from type, which will not catch call on non-leaf node if None
@@ -189,6 +207,12 @@ class ConfigDiff(object):
             raise ConfigDiffError("get_value_changed called on non-leaf node")
 
         return new_value, old_value
+
+    def value_changed(self, path=[]):
+        a, b = self.get_value(path)
+        if a is b:
+            return False
+        return True
 
     # general purpose; same form as Config.get_config_dict
     def get_config_dict(self, path=[], effective=False, key_mangling=None, get_first_key=False):
