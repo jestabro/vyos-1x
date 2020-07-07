@@ -21,10 +21,15 @@ from vyos.util import get_sub_dict, mangle_dict_keys
 
 class ConfigDiffError(Exception):
     """
+    Raised on config dict access errors, for example, calling get_value on
+    a non-leaf node.
     """
     pass
 
 def get_config_diff(config):
+    """
+    Check type and return ConfigDiff instance.
+    """
     if not config or not isinstance(config, Config):
         raise TypeError("argument must me a Config instance")
     return ConfigDiff(config)
@@ -58,6 +63,8 @@ def _mangle_dict_keys(d, key_mangling):
 
 class ConfigDiff(object):
     """
+    The class of config changes as represented by comparison between the
+    session config dict and the effective config dict.
     """
     def __init__(self, config):
         self._level = config.get_level()
@@ -108,6 +115,15 @@ class ConfigDiff(object):
         return ret
 
     def get_child_nodes_changed(self, path=[], return_as_dict=False, key_mangling=None):
+        """
+        Args:
+            path (str|list): config path
+            return_as_dict=False: return dict under node, instead of list of nodes
+            key_mangling=None: if return_as_dict, mangle dict keys
+
+        Returns: (added, deleted) tuple of list of child nodes added/deleted;
+                                  tuple of dict, if keyword arg return_as_dict
+        """
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path), get_first_key=True)
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path), get_first_key=True)
 
@@ -125,6 +141,15 @@ class ConfigDiff(object):
         return added_dict, deleted_dict
 
     def get_child_nodes_unchanged(self, path=[], return_as_dict=False, key_mangling=None):
+        """
+        Args:
+            path (str|list): config path
+            return_as_dict=False: return dict under node, instead of list of nodes
+            key_mangling=None: if return_as_dict, mangle dict keys
+
+        Returns: list of child nodes unchanged in session;
+                 dict, if keyword arg return_as_dict
+        """
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path), get_first_key=True)
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path), get_first_key=True)
 
@@ -146,6 +171,17 @@ class ConfigDiff(object):
         return True
 
     def get_node_changed(self, path=[], return_as_dict=False, key_mangling=None):
+        """
+        Args:
+            path (str|list): config path
+            return_as_dict=False: return dict under node, instead of list of nodes
+            key_mangling=None: if return_as_dict, mangle dict keys
+
+        Returns: tuple ([node_name], []) if added, respectively
+                       ([], [node_name]) if deleted,
+                       ([], []) if unchanged; more useful with return_as_dict
+                 tuple of dict, if keyword arg return_as_dict
+        """
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
 
@@ -162,6 +198,15 @@ class ConfigDiff(object):
         return added_dict, deleted_dict
 
     def get_node_unchanged(self, path=[], return_as_dict=False, key_mangling=None):
+        """
+        Args:
+            path (str|list): config path
+            return_as_dict=False: return dict under node, instead of list of nodes
+            key_mangling=None: if return_as_dict, mangle dict keys
+
+        Returns: [node_name] if unchanged in session;
+                 dict, if keyword arg return_as_dict
+        """
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
 
@@ -189,6 +234,12 @@ class ConfigDiff(object):
         return True
 
     def get_value(self, path=[]):
+        """
+        Args:
+            path (str|list): config path
+
+        Returns: (new, old) tuple of values in session config/effective config
+        """
         # one should properly use is_leaf as check; for the moment we will
         # deduce from type, which will not catch call on non-leaf node if None
         new_value_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
@@ -216,6 +267,15 @@ class ConfigDiff(object):
 
     # general purpose; same form as Config.get_config_dict
     def get_config_dict(self, path=[], effective=False, key_mangling=None, get_first_key=False):
+        """
+        Args:
+            path (str|list): configuration tree path, can be empty
+            effective=False: effective or session config
+            key_mangling=None: mangle dict keys according to regex and replacement
+            get_first_key=False: if k = path[:-1], return sub-dict d[k] instead of {k: d[k]}
+
+        Returns: a dict representation of the config under path
+        """
         if effective:
             config_dict = self._effective_config_dict
         else:
