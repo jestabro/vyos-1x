@@ -17,7 +17,9 @@
 """
 
 from vyos.config import Config
-from vyos.util import get_sub_dict, mangle_dict_keys
+from vyos.configdict import dict_merge
+from vyos.util import get_sub_dict
+from vyos.xml import defaults
 
 class ConfigDiffError(Exception):
     """
@@ -26,23 +28,29 @@ class ConfigDiffError(Exception):
     """
     pass
 
-def get_config_diff(config):
+def get_config_diff(config, key_mangling=None):
     """
     Check type and return ConfigDiff instance.
     """
     if not config or not isinstance(config, Config):
         raise TypeError("argument must me a Config instance")
-    return ConfigDiff(config)
+    if not (isinstance(key_mangling, tuple) and \
+            (len(key_mangling) == 2) and \
+            isinstance(key_mangling[0], str) and \
+            isinstance(key_mangling[1], str)):
+        raise ValueError("key_mangling must be a tuple of two strings")
+    return ConfigDiff(config, key_mangling)
 
 def _key_sets_from_dicts(session_dict, effective_dict):
     session_keys = list(session_dict)
     effective_keys = list(effective_dict)
 
     stable_keys = [k for k in session_keys if k in effective_keys]
-    added_keys = [k for k in session_keys if k not in stable_keys]
-    deleted_keys = [k for k in effective_keys if k not in stable_keys]
+    add_keys = [k for k in session_keys if k not in stable_keys]
+    delete_keys = [k for k in effective_keys if k not in stable_keys]
+    merge_keys = session_keys
 
-    return added_keys, deleted_keys, stable_keys
+    return merge_keys, delete_keys, add_keys, stable_keys
 
 def _dict_from_key_set(d, key_set):
     # This will always be applied to a key_set obtained from a get_sub_dict,
@@ -51,25 +59,16 @@ def _dict_from_key_set(d, key_set):
     ret = {k: d[k] for k in key_set}
     return ret
 
-def _mangle_dict_keys(d, key_mangling):
-    if not (isinstance(key_mangling, tuple) and \
-            (len(key_mangling) == 2) and \
-            isinstance(key_mangling[0], str) and \
-            isinstance(key_mangling[1], str)):
-        raise ValueError("key_mangling must be a tuple of two strings")
-    else:
-        d = mangle_dict_keys(d, key_mangling[0], key_mangling[1])
-        return d
-
 class ConfigDiff(object):
     """
     The class of config changes as represented by comparison between the
     session config dict and the effective config dict.
     """
-    def __init__(self, config):
+    def __init__(self, config, key_mangling=None):
         self._level = config.get_level()
-        self._session_config_dict = config.get_config_dict()
-        self._effective_config_dict = config.get_config_dict(effective=True)
+        self._session_config_dict = config.get_config_dict(key_mangling=key_mangling)
+        self._effective_config_dict = config.get_config_dict(effective=True,
+                                                             key_mangling=key_mangling)
 
     def _make_path(self, path):
         # mirrored from Config; allow path arguments relative to level
@@ -114,122 +113,84 @@ class ConfigDiff(object):
         ret = self._level.copy()
         return ret
 
-    def get_child_nodes_changed(self, path=[], return_as_dict=False, key_mangling=None):
+    def get_child_nodes(self, path=[], no_defaults=False):
         """
         Args:
             path (str|list): config path
-            return_as_dict=False: return dict under node, instead of list of nodes
-            key_mangling=None: if return_as_dict, mangle dict keys
+            no_detaults=False: do not merge default values to ret['merge']
 
-        Returns: (added, deleted) tuple of list of child nodes added/deleted;
-                                  tuple of dict, if keyword arg return_as_dict
+        Returns: dict of dicts, representing differences between session
+                                and effective config, under path
+                 dict['merge'] = session config values, merged with defaults, unless no_defaults
+                 dict['delete'] = effective config values, not in session
+                 dict['add'] = session config values, not in effective
+                 dict['stable'] = config values in both session and effective
         """
+        ret = {'merge': {}, 'delete': {}, 'add': {}, 'stable': {}}
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path), get_first_key=True)
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path), get_first_key=True)
 
-        added_keys, deleted_keys, _ = _key_sets_from_dicts(session_dict, effective_dict)
+        merge_keys, delete_keys, add_keys, stable_keys = _key_sets_from_dicts(session_dict, effective_dict)
 
-        if not return_as_dict:
-            return added_keys, deleted_keys
+        ret['merge'] = _dict_from_key_set(session_dict, merge_keys)
+        ret['delete'] = _dict_from_key_set(effective_dict, delete_keys)
+        ret['add'] = _dict_from_key_set(session_dict, add_keys)
+        ret['stable'] = _dict_from_key_set(session_dict, stable_keys)
 
-        added_dict = _dict_from_key_set(session_dict, added_keys)
-        deleted_dict = _dict_from_key_set(effective_dict, deleted_keys)
-        if key_mangling:
-            added_dict = _mangle_dict_keys(added_dict, key_mangling)
-            deleted_dict = _mangle_dict_keys(deleted_dict, key_mangling)
+        if not no_defaults:
+            default_values = defaults(path)
+            ret['merge'] = dict_merge(default_values, ret['merge'])
 
-        return added_dict, deleted_dict
+        return ret
 
-    def get_child_nodes_unchanged(self, path=[], return_as_dict=False, key_mangling=None):
-        """
-        Args:
-            path (str|list): config path
-            return_as_dict=False: return dict under node, instead of list of nodes
-            key_mangling=None: if return_as_dict, mangle dict keys
-
-        Returns: list of child nodes unchanged in session;
-                 dict, if keyword arg return_as_dict
-        """
-        session_dict = get_sub_dict(self._session_config_dict, self._make_path(path), get_first_key=True)
-        effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path), get_first_key=True)
-
-        _, _, stable_keys = _key_sets_from_dicts(session_dict, effective_dict)
-
-        if not return_as_dict:
-            return stable_keys
-
-        stable_dict = _dict_from_key_set(session_dict, stable_keys)
-        if key_mangling:
-            stable_dict = _mangle_dict_keys(stable_dict, key_mangling)
-
-        return stable_dict
-
+    # For illustration; in practice, one will likely want the full dict
     def child_nodes_changed(self, path=[]):
-        a, b = self.get_child_nodes_changed(path)
-        if not a and not b:
+        ret = self.get_child_nodes(path)
+        if not ret['add'] and not ret['delete']:
             return False
         return True
 
-    def get_node_changed(self, path=[], return_as_dict=False, key_mangling=None):
+    def get_node(self, path=[], no_defaults=False):
         """
         Args:
             path (str|list): config path
-            return_as_dict=False: return dict under node, instead of list of nodes
-            key_mangling=None: if return_as_dict, mangle dict keys
+            no_detaults=False: do not merge default values to ret['merge']
 
-        Returns: tuple ([node_name], []) if added, respectively
-                       ([], [node_name]) if deleted,
-                       ([], []) if unchanged; more useful with return_as_dict
-                 tuple of dict, if keyword arg return_as_dict
+        Returns: dict of dicts, representing differences between session
+                                and effective config, under path
+                 dict['merge'] = session config values, merged with defaults, unless no_defaults
+                 dict['delete'] = effective config values, not in session
+                 dict['add'] = session config values, not in effective
+                 dict['stable'] = config values in both session and effective
         """
+        ret = {'merge': {}, 'delete': {}, 'add': {}, 'stable': {}}
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
 
-        added_key, deleted_key, _ = _key_sets_from_dicts(session_dict, effective_dict)
-        if not return_as_dict:
-            return added_key, deleted_key
+        merge_keys, delete_keys, add_keys, stable_keys = _key_sets_from_dicts(session_dict, effective_dict)
 
-        added_dict = _dict_from_key_set(session_dict, added_key)
-        deleted_dict = _dict_from_key_set(effective_dict, deleted_key)
-        if key_mangling:
-            added_dict = _mangle_dict_keys(added_dict, key_mangling)
-            deleted_dict = _mangle_dict_keys(deleted_dict, key_mangling)
+        ret['merge'] = _dict_from_key_set(session_dict, merge_keys)
+        ret['delete'] = _dict_from_key_set(effective_dict, delete_keys)
+        ret['add'] = _dict_from_key_set(session_dict, add_keys)
+        ret['stable'] = _dict_from_key_set(session_dict, stable_keys)
 
-        return added_dict, deleted_dict
+        if not no_defaults:
+            default_values = defaults(path)
+            ret['merge'] = dict_merge(default_values, ret['merge'])
 
-    def get_node_unchanged(self, path=[], return_as_dict=False, key_mangling=None):
-        """
-        Args:
-            path (str|list): config path
-            return_as_dict=False: return dict under node, instead of list of nodes
-            key_mangling=None: if return_as_dict, mangle dict keys
+        return ret
 
-        Returns: [node_name] if unchanged in session;
-                 dict, if keyword arg return_as_dict
-        """
-        session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
-        effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
-
-        _, _, stable_key = _key_sets_from_dicts(session_dict, effective_dict)
-
-        if not return_as_dict:
-            return stable_key
-
-        stable_dict = _dict_from_key_set(session_dict, stable_key)
-        if key_mangling:
-            stable_dict = _mangle_dict_keys(stable_dict, key_mangling)
-
-        return stable_dict
-
+    # For illustration; in practice, one will likely want the full dict
     def node_added(self, path=[]):
-        a, _ = self.get_node_changed(path)
-        if not a:
+        ret = self.get_node(path)
+        if not ret['add']:
             return False
         return True
 
+    # For illustration; in practice, one will likely want the full dict
     def node_deleted(self, path=[]):
-        _, b = self.get_node_changed(path)
-        if not b:
+        ret = self.get_node(path)
+        if not ret['delete']:
             return False
         return True
 
@@ -259,19 +220,20 @@ class ConfigDiff(object):
 
         return new_value, old_value
 
+    # For illustration; in practice, one will likely want the full dict
     def value_changed(self, path=[]):
         a, b = self.get_value(path)
         if a is b:
             return False
         return True
 
-    # general purpose; same form as Config.get_config_dict
-    def get_config_dict(self, path=[], effective=False, key_mangling=None, get_first_key=False):
+    # general purpose; similar form as Config.get_config_dict, though
+    # key_mangling is defined on init
+    def get_config_dict(self, path=[], effective=False, get_first_key=False):
         """
         Args:
             path (str|list): configuration tree path, can be empty
             effective=False: effective or session config
-            key_mangling=None: mangle dict keys according to regex and replacement
             get_first_key=False: if k = path[:-1], return sub-dict d[k] instead of {k: d[k]}
 
         Returns: a dict representation of the config under path
@@ -282,7 +244,5 @@ class ConfigDiff(object):
             config_dict = self._session_config_dict
 
         config_dict = get_sub_dict(config_dict, self._make_path(path), get_first_key)
-        if key_mangling:
-            config_dict = _mangle_dict_keys(config_dict, key_mangling)
 
         return config_dict
