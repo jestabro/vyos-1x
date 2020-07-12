@@ -16,6 +16,8 @@
 """
 """
 
+from enum import IntFlag, auto
+
 from vyos.config import Config
 from vyos.configdict import dict_merge
 from vyos.util import get_sub_dict
@@ -28,36 +30,53 @@ class ConfigDiffError(Exception):
     """
     pass
 
+def enum_to_key(e):
+    return e.name.lower()
+
+class Diff(IntFlag):
+    MERGE = auto()
+    DELETE = auto()
+    ADD = auto()
+    STABLE = auto()
+
+requires_effective = enum_to_key(Diff.DELETE)
+to_merge_defaults = enum_to_key(Diff.MERGE)
+
+def _key_sets_from_dicts(session_dict, effective_dict):
+    session_keys = list(session_dict)
+    effective_keys = list(effective_dict)
+
+    ret = {}
+    stable_keys = [k for k in session_keys if k in effective_keys]
+
+    ret[enum_to_key(Diff.STABLE)] = stable_keys
+    ret[enum_to_key(Diff.ADD)] = [k for k in session_keys if k not in stable_keys]
+    ret[enum_to_key(Diff.DELETE)] = [k for k in effective_keys if k not in stable_keys]
+    ret[enum_to_key(Diff.MERGE)] = session_keys
+
+    return ret
+
+def _dict_from_key_set(key_set, d):
+    # This will always be applied to a key_set obtained from a get_sub_dict,
+    # hence there is no possibility of KeyError, as get_sub_dict guarantees
+    # a return type of dict
+    ret = {k: d[k] for k in key_set}
+
+    return ret
+
 def get_config_diff(config, key_mangling=None):
     """
     Check type and return ConfigDiff instance.
     """
     if not config or not isinstance(config, Config):
         raise TypeError("argument must me a Config instance")
-    if not (isinstance(key_mangling, tuple) and \
+    if key_mangling and not (isinstance(key_mangling, tuple) and \
             (len(key_mangling) == 2) and \
             isinstance(key_mangling[0], str) and \
             isinstance(key_mangling[1], str)):
         raise ValueError("key_mangling must be a tuple of two strings")
+
     return ConfigDiff(config, key_mangling)
-
-def _key_sets_from_dicts(session_dict, effective_dict):
-    session_keys = list(session_dict)
-    effective_keys = list(effective_dict)
-
-    stable_keys = [k for k in session_keys if k in effective_keys]
-    add_keys = [k for k in session_keys if k not in stable_keys]
-    delete_keys = [k for k in effective_keys if k not in stable_keys]
-    merge_keys = session_keys
-
-    return merge_keys, delete_keys, add_keys, stable_keys
-
-def _dict_from_key_set(d, key_set):
-    # This will always be applied to a key_set obtained from a get_sub_dict,
-    # hence there is no possibility of KeyError, as get_sub_dict guarantees
-    # a return type of dict
-    ret = {k: d[k] for k in key_set}
-    return ret
 
 class ConfigDiff(object):
     """
@@ -113,7 +132,7 @@ class ConfigDiff(object):
         ret = self._level.copy()
         return ret
 
-    def get_child_nodes(self, path=[], no_defaults=False):
+    def get_child_nodes(self, path=[], expand_nodes=Diff(0), no_defaults=False):
         """
         Args:
             path (str|list): config path
@@ -126,20 +145,25 @@ class ConfigDiff(object):
                  dict['add'] = session config values, not in effective
                  dict['stable'] = config values in both session and effective
         """
-        ret = {'merge': {}, 'delete': {}, 'add': {}, 'stable': {}}
-        session_dict = get_sub_dict(self._session_config_dict, self._make_path(path), get_first_key=True)
-        effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path), get_first_key=True)
+        session_dict = get_sub_dict(self._session_config_dict,
+                                    self._make_path(path), get_first_key=True)
+        effective_dict = get_sub_dict(self._effective_config_dict,
+                                      self._make_path(path), get_first_key=True)
 
-        merge_keys, delete_keys, add_keys, stable_keys = _key_sets_from_dicts(session_dict, effective_dict)
+        ret = _key_sets_from_dicts(session_dict, effective_dict)
 
-        ret['merge'] = _dict_from_key_set(session_dict, merge_keys)
-        ret['delete'] = _dict_from_key_set(effective_dict, delete_keys)
-        ret['add'] = _dict_from_key_set(session_dict, add_keys)
-        ret['stable'] = _dict_from_key_set(session_dict, stable_keys)
+        for e in Diff:
+            if expand_nodes & e:
+                k = enum_to_key(e)
+                if k is requires_effective:
+                    ret[k] = _dict_from_key_set(effective_dict, ret[k])
+                else:
+                    ret[k] = _dict_from_key_set(session_dict, ret[k])
 
-        if not no_defaults:
-            default_values = defaults(path)
-            ret['merge'] = dict_merge(default_values, ret['merge'])
+                if k is to_merge_defaults and not no_defaults:
+                    default_values = defaults(self._make_path(path))
+                    print(f"JSE --- defaults: {default_values}")
+                    ret[k] = dict_merge(default_values, ret[k])
 
         return ret
 
@@ -150,7 +174,7 @@ class ConfigDiff(object):
             return False
         return True
 
-    def get_node(self, path=[], no_defaults=False):
+    def get_node(self, path=[], expand_nodes=Diff(0), no_defaults=False):
         """
         Args:
             path (str|list): config path
@@ -163,20 +187,23 @@ class ConfigDiff(object):
                  dict['add'] = session config values, not in effective
                  dict['stable'] = config values in both session and effective
         """
-        ret = {'merge': {}, 'delete': {}, 'add': {}, 'stable': {}}
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
 
-        merge_keys, delete_keys, add_keys, stable_keys = _key_sets_from_dicts(session_dict, effective_dict)
+        ret = _key_sets_from_dicts(session_dict, effective_dict)
 
-        ret['merge'] = _dict_from_key_set(session_dict, merge_keys)
-        ret['delete'] = _dict_from_key_set(effective_dict, delete_keys)
-        ret['add'] = _dict_from_key_set(session_dict, add_keys)
-        ret['stable'] = _dict_from_key_set(session_dict, stable_keys)
+        for e in Diff:
+            if expand_nodes & e:
+                k = enum_to_key(e)
+                if k is requires_effective:
+                    ret[k] = _dict_from_key_set(effective_dict, ret[k])
+                else:
+                    ret[k] = _dict_from_key_set(session_dict, ret[k])
 
-        if not no_defaults:
-            default_values = defaults(path)
-            ret['merge'] = dict_merge(default_values, ret['merge'])
+                if k is to_merge_defaults and not no_defaults:
+                    default_values = defaults(self._make_path(path))
+                    print(f"JSE --- defaults: {default_values}")
+                    ret[k] = dict_merge(default_values, ret[k])
 
         return ret
 

@@ -248,6 +248,8 @@ class XML(dict):
     def defaults(self, lpath, flat):
         d = self[kw.default]
         for k in lpath:
+            if not d.get(k):
+                return d
             d = d[k]
 
         if not flat:
