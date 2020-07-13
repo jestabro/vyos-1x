@@ -39,8 +39,8 @@ class Diff(IntFlag):
     ADD = auto()
     STABLE = auto()
 
-requires_effective = enum_to_key(Diff.DELETE)
-to_merge_defaults = enum_to_key(Diff.MERGE)
+requires_effective = [enum_to_key(Diff.DELETE)]
+target_defaults = [enum_to_key(Diff.MERGE)]
 
 def _key_sets_from_dicts(session_dict, effective_dict):
     session_keys = list(session_dict)
@@ -49,10 +49,10 @@ def _key_sets_from_dicts(session_dict, effective_dict):
     ret = {}
     stable_keys = [k for k in session_keys if k in effective_keys]
 
-    ret[enum_to_key(Diff.STABLE)] = stable_keys
-    ret[enum_to_key(Diff.ADD)] = [k for k in session_keys if k not in stable_keys]
-    ret[enum_to_key(Diff.DELETE)] = [k for k in effective_keys if k not in stable_keys]
     ret[enum_to_key(Diff.MERGE)] = session_keys
+    ret[enum_to_key(Diff.DELETE)] = [k for k in effective_keys if k not in stable_keys]
+    ret[enum_to_key(Diff.ADD)] = [k for k in session_keys if k not in stable_keys]
+    ret[enum_to_key(Diff.STABLE)] = stable_keys
 
     return ret
 
@@ -89,8 +89,8 @@ class ConfigDiff(object):
         self._effective_config_dict = config.get_config_dict(effective=True,
                                                              key_mangling=key_mangling)
 
+    # mirrored from Config; allow path arguments relative to level
     def _make_path(self, path):
-        # mirrored from Config; allow path arguments relative to level
         if isinstance(path, str):
             path = path.split()
         elif isinstance(path, list):
@@ -152,15 +152,18 @@ class ConfigDiff(object):
 
         ret = _key_sets_from_dicts(session_dict, effective_dict)
 
+        if not expand_nodes:
+            return ret
+
         for e in Diff:
             if expand_nodes & e:
                 k = enum_to_key(e)
-                if k is requires_effective:
-                    ret[k] = _dict_from_key_set(effective_dict, ret[k])
+                if k in requires_effective:
+                    ret[k] = _dict_from_key_set(ret[k], effective_dict)
                 else:
-                    ret[k] = _dict_from_key_set(session_dict, ret[k])
+                    ret[k] = _dict_from_key_set(ret[k], session_dict)
 
-                if k is to_merge_defaults and not no_defaults:
+                if k in target_defaults and not no_defaults:
                     default_values = defaults(self._make_path(path))
                     print(f"JSE --- defaults: {default_values}")
                     ret[k] = dict_merge(default_values, ret[k])
@@ -192,17 +195,19 @@ class ConfigDiff(object):
 
         ret = _key_sets_from_dicts(session_dict, effective_dict)
 
+        if not expand_nodes:
+            return ret
+
         for e in Diff:
             if expand_nodes & e:
                 k = enum_to_key(e)
-                if k is requires_effective:
-                    ret[k] = _dict_from_key_set(effective_dict, ret[k])
+                if k in requires_effective:
+                    ret[k] = _dict_from_key_set(ret[k], effective_dict)
                 else:
-                    ret[k] = _dict_from_key_set(session_dict, ret[k])
+                    ret[k] = _dict_from_key_set(ret[k], session_dict)
 
-                if k is to_merge_defaults and not no_defaults:
+                if k in target_defaults and not no_defaults:
                     default_values = defaults(self._make_path(path))
-                    print(f"JSE --- defaults: {default_values}")
                     ret[k] = dict_merge(default_values, ret[k])
 
         return ret
