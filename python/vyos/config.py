@@ -87,6 +87,7 @@ class Config(object):
             self._config_source = config_source
 
         self._level = []
+        self._dict_cache = {}
         (self._running_config,
          self._session_config) = self._config_source.get_configtree_tuple()
 

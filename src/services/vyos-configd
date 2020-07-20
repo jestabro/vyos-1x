@@ -24,7 +24,8 @@ import logging
 import importlib.util
 import zmq
 
-from vyos.frozen_config import FrozenConfig
+from vyos.configsource import ConfigSourceString
+from vyos.config import Config
 from vyos import ConfigError
 
 debug = True
@@ -100,8 +101,10 @@ def initialization(socket):
     resp = "session"
     socket.send(resp.encode())
 
-    config = FrozenConfig(running_config_text=active_string,
-                          session_config_text=session_string)
+    configsource = ConfigSourceString(running_config_text=active_string,
+                                      session_config_text=session_string)
+
+    config = Config(config_source=configsource)
 
     return config
 
