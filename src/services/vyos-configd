@@ -50,31 +50,49 @@ R_ERROR_DAEMON = 4
 R_PASS = 8
 
 vyos_conf_scripts_dir = '/usr/libexec/vyos/conf_mode'
+configd_exclude_file = '/usr/share/vyos/configd-exclude.json'
 
 active_string = ''
 session_string = ''
 
-exclude = []
+def _key_name_from_file_name(f):
+    return os.path.splitext(f)[0]
+
+def _module_name_from_key(k):
+    return k.replace('-', '_')
+
+def _path_from_file_name(f):
+    return os.path.join(vyos_conf_scripts_dir, f)
 
 # import conf_mode scripts
 # single example for testing
 files = ['interfaces-dummy.py', 'test_simple.py']
-imports = [os.path.splitext(i)[0] for i in files]
+imports = [_key_name_from_file_name(f) for f in files]
 # canonicalize name for loading; we will use 'imports' (previous line)
 # for dict keys, however, so as to pass them directly from the node defs
 # This is not strictly necessary to load the module, but proper:
-module_names = [i.replace('-', '_') for i in imports]
-to_load = list(zip(module_names, files))
+module_names = [_module_name_from_key(k) for k in imports]
+paths = [_path_from_file_name(f) for f in files]
+to_load = list(zip(module_names, paths))
 
 modules = []
 
 for x in to_load:
-    spec = importlib.util.spec_from_file_location(x[0], vyos_conf_scripts_dir + '/' + x[1])
+    spec = importlib.util.spec_from_file_location(x[0], x[1])
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     modules.append(module)
 
 conf_mode_scripts = dict(zip(imports, modules))
+
+exclude = []
+
+with open(configd_exclude_file) as f:
+    exclude_files = json.load(f)
+
+exclude = [_key_name_from_file_name(f) for f in exclude_files]
+
+print(f"JSE --- exclude: {exclude}")
 
 def run_script(script, config) -> int:
     config.set_level([])
