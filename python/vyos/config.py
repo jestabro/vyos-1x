@@ -65,6 +65,7 @@ In operational mode, all functions return values from the running config.
 
 import re
 import json
+from copy import deepcopy
 
 import vyos.util
 import vyos.configtree
