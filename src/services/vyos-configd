@@ -21,9 +21,11 @@ import sys
 import re
 import json
 import logging
+import signal
 import importlib.util
 import zmq
 
+from vyos.defaults import directories
 from vyos.configsource import ConfigSourceString
 from vyos.config import Config
 from vyos import ConfigError
@@ -49,8 +51,10 @@ R_ERROR_COMMIT = 2
 R_ERROR_DAEMON = 4
 R_PASS = 8
 
-vyos_conf_scripts_dir = '/usr/libexec/vyos/conf_mode'
-configd_exclude_file = '/usr/share/vyos/configd-exclude.json'
+vyos_conf_scripts_dir = directories['conf_mode']
+configd_exclude_file = os.path.join(directories['data'], 'configd-exclude.json')
+configd_env_set_file = os.path.join(directories['data'], 'vyos-configd-env-set')
+configd_env_unset_file = os.path.join(directories['data'], 'vyos-configd-env-unset')
 
 active_string = ''
 session_string = ''
@@ -151,6 +155,12 @@ def process_node_data(socket, config, data) -> int:
 
     return result
 
+def shutdown():
+    os.remove('/etc/default/vyos-configd-env')
+    dst = '/etc/default/vyos-configd-env'
+    os.symlink(configd_env_unset_file, dst)
+    sys.exit(0)
+
 if __name__ == '__main__':
     context = zmq.Context()
     socket = context.socket(zmq.REP)
@@ -159,6 +169,16 @@ if __name__ == '__main__':
     o_mask = os.umask(0)
     socket.bind(SOCKET_PATH)
     os.umask(o_mask)
+
+    # Define the vyshim environment variable
+    os.remove('/etc/default/vyos-configd-env')
+    dst = '/etc/default/vyos-configd-env'
+    os.symlink(configd_env_set_file, dst)
+
+    def sig_handler(signum, frame):
+        shutdown()
+
+    signal.signal(signal.SIGTERM, sig_handler)
 
     config = None
 
