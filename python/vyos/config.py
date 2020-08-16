@@ -194,27 +194,22 @@ class Config(object):
         """
         return self._config_source.show_config(path, default, effective)
 
-    def get_cached_root_dict(self, effective=False, multi=False):
-        cached = self._dict_cache.get((effective, multi), {})
+    def get_cached_root_dict(self, effective=False):
+        cached = self._dict_cache.get((effective), {})
         if cached:
             return cached
 
-        config_dict = self._dict_cache.get((effective, False), None)
-        if config_dict is None:
-            if effective:
-                config = self._running_config
-            else:
-                config = self._session_config
+        if effective:
+            config = self._running_config
+        else:
+            config = self._session_config
 
-            if config:
-                config_dict = json.loads(config.to_json())
-            else:
-                config_dict = {}
+        if config:
+            config_dict = json.loads(config.to_json())
+        else:
+            config_dict = {}
 
-        self._dict_cache[(effective, False)] = config_dict
-        if multi:
-            config_dict = vyos.xml.multi_to_list([], config_dict)
-            self._dict_cache[(effective, True)] = config_dict
+        self._dict_cache[effective] = config_dict
 
         return config_dict
 
@@ -229,13 +224,22 @@ class Config(object):
 
         Returns: a dict representation of the config under path
         """
-        root_dict = self.get_cached_root_dict(effective, multi)
-        conf_dict = vyos.util.get_sub_dict(root_dict, self._make_path(path), get_first_key)
+        lpath = self._make_path(path)
+        root_dict = self.get_cached_root_dict(effective)
+        conf_dict = vyos.util.get_sub_dict(root_dict, lpath, get_first_key)
 
-        if not key_mangling:
+        if not key_mangling and not multi:
             return deepcopy(conf_dict)
 
-        # XXX: mangle_dict_keys could/should perform this check
+        xmlpath = lpath if get_first_key else lpath[:-1]
+
+        if not key_mangling:
+            conf_dict = vyos.xml.multi_to_list(xmlpath, conf_dict)
+            return conf_dict
+
+        if multi:
+            conf_dict = vyos.xml.multi_to_list(xmlpath, conf_dict)
+
         if not (isinstance(key_mangling, tuple) and \
                 (len(key_mangling) == 2) and \
                 isinstance(key_mangling[0], str) and \
@@ -243,6 +247,7 @@ class Config(object):
             raise ValueError("key_mangling must be a tuple of two strings")
 
         conf_dict = vyos.util.mangle_dict_keys(conf_dict, key_mangling[0], key_mangling[1])
+
         return conf_dict
 
     def is_multi(self, path):
