@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+
+# Basic idea contained here: rewriting xml with lxml xpath
+# This poc has hardcodings for grabbing the redundant mtu,
+# and needs the obvious generalization --- check for redundancy
+# on name, and replace/remove
+
+from lxml import etree
+
+if __name__ == '__main__':
+    for fname in ['build/interface-definitions/interfaces-pppoe.xml']:
+        tree = etree.parse(fname)
+        root = tree.getroot()
+
+        xpath_str = f'//defaultValue'
+        p = tree.xpath(xpath_str)
+        print(f'tree.xpath is {p}')
+        for path in p:
+            ap = path.xpath('ancestor::*[@name]')
+            print(f'ancestor path: {ap}')
+            print(f'last name: {ap[-1].get("name")}')
+
+        value = root.xpath(xpath_str)
+        print(f'what: {etree.tostring(value[3])}')
+        residual = value[3].getparent()
+        print(f'what: {etree.tostring(residual)}')
+        value[2].getparent().replace(value[2], value[3])
+        residual.getparent().remove(residual)
+        rev_str = etree.tostring(root, pretty_print=True)
+        with open('./rev.output', 'wb') as f:
+            f.write(rev_str)
