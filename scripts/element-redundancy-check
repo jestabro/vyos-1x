@@ -5,10 +5,21 @@ from lxml import etree
 
 def read_node(n, tree, record):
     name = n.get("name")
+    print(f'name is {name}')
     node_type = n.tag
     depth = len(tree.getelementpath(n).split('/'))
+    xpath_str = f'//node[@name="{name}"]'
+#    print(f'xpath_str: {xpath_str}')
+    p = tree.xpath(xpath_str)
+    print(f'tree.xpath is {p}')
+    for path in p:
+        ap = path.xpath('ancestor::*[@name]')
+        print(f"ancestor path: {ap}")
+    
     if node_type in ("node", "tagNode"):
         record.setdefault(depth, []).append(name)
+    if name == 'radius':
+        print(f'radius node: {n}')
 
     children = n.find("children")
     if node_type in ("node", "tagNode"):
@@ -24,7 +35,8 @@ def report_redundancy(fname, record):
                 print(f'element {el} appears {num} times at depth {k} in {fname}')
 
 def main():
-    for fname in glob.glob('build/interface-definitions/*.xml'):
+#    for fname in glob.glob('build/interface-definitions/*.xml'):
+    for fname in ['build/interface-definitions/system-login.xml']:
         tree = etree.parse(fname)
         root = tree.getroot()
 
