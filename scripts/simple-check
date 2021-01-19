@@ -7,25 +7,45 @@
 
 from lxml import etree
 
-if __name__ == '__main__':
+def override_element(l: list):
+    #
+    #
+    #
+    if len(l) < 2:
+        print("error: passing list of single element to override_element")
+
+    # assemble list of leafNodes of overriding defaultValues, for later removal
+    parents = []
+    for el in l[1:]:
+        parents.append(el.getparent())
+    # replace element with final override
+    l[0].getparent().replace(l[0], l[-1])
+    # remove all but overridden element
+    for el in parents:
+        el.getparent().remove(el)
+
+def main():
     for fname in ['build/interface-definitions/interfaces-pppoe.xml']:
         tree = etree.parse(fname)
         root = tree.getroot()
-
         xpath_str = f'//defaultValue'
         p = tree.xpath(xpath_str)
-        print(f'tree.xpath is {p}')
+
+        inst = []
+        cand = {}
         for path in p:
             ap = path.xpath('ancestor::*[@name]')
-            print(f'ancestor path: {ap}')
-            print(f'last name: {ap[-1].get("name")}')
+            cand.setdefault((ap[-1].get("name"), str(ap[:-1])), []).append(path)
 
-        value = root.xpath(xpath_str)
-        print(f'what: {etree.tostring(value[3])}')
-        residual = value[3].getparent()
-        print(f'what: {etree.tostring(residual)}')
-        value[2].getparent().replace(value[2], value[3])
-        residual.getparent().remove(residual)
-        rev_str = etree.tostring(root, pretty_print=True)
-        with open('./rev.output', 'wb') as f:
+        for k, v in cand.items():
+            if len(v) > 1:
+                print(f'redundency in {k[0]}')
+                override_element(v)
+
+        rev_str = etree.tostring(root, encoding='unicode', pretty_print=True)
+
+        with open('./rev.output', 'w') as f:
             f.write(rev_str)
+
+if __name__ == '__main__':
+    main()
