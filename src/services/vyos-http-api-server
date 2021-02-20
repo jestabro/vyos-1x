@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
 #
-# Copyright (C) 2019 VyOS maintainers and contributors
+# Copyright (C) 2019-2020 VyOS maintainers and contributors
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 or later as
@@ -22,22 +21,25 @@ import grp
 import json
 import traceback
 import threading
-import signal
+from functools import wraps
+from typing import List, Union
+
+import uvicorn
+from fastapi import FastAPI, Form
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Json
 
 import vyos.config
 
-from flask import Flask, request
-from waitress import serve
-
-from functools import wraps
-
 from vyos.configsession import ConfigSession, ConfigSessionError
-
 
 DEFAULT_CONFIG_FILE = '/etc/vyos/http-api.conf'
 CFG_GROUP = 'vyattacfg'
 
-app = Flask(__name__)
+app = FastAPI(debug=True,
+              title="VyOS API",
+              version="0.1.0")
 
 # Giant lock!
 lock = threading.Lock()
@@ -56,31 +58,17 @@ def check_auth(key_list, key):
 
 def error(code, msg):
     resp = {"success": False, "error": msg, "data": None}
-    return json.dumps(resp), code
+    return JSONResponse(resp, status_code=code)
 
 def success(data):
     resp = {"success": True, "data": data, "error": None}
-    return json.dumps(resp)
-
-def get_command(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        cmd = request.form.get("data")
-        if not cmd:
-            return error(400, "Non-empty data field is required")
-        try:
-            cmd = json.loads(cmd)
-        except Exception as e:
-            return error(400, "Failed to parse JSON: {0}".format(e))
-        return f(cmd, *args, **kwargs)
-
-    return decorated_function
+    return JSONResponse(resp)
 
 def auth_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        key = request.form.get("key")
-        api_keys = app.config['vyos_keys']
+        key = kwargs['key']
+        api_keys = app.state.vyos_keys
         id = check_auth(api_keys, key)
         if not id:
             return error(401, "Valid API key is required")
@@ -88,23 +76,53 @@ def auth_required(f):
 
     return decorated_function
 
-@app.route('/configure', methods=['POST'])
-@get_command
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return error(400, str(exc))
+
+# Pydantic models for validation
+
+class ConfigureRequest(BaseModel):
+    op: str
+    path: List[str]
+    value: str = None
+
+class RetrieveRequest(BaseModel):
+    op: str
+    path: List[str]
+    configFormat: str = None
+
+class ConfigFileRequest(BaseModel):
+    op: str
+    file: str = None
+
+class ImageRequest(BaseModel):
+    op: str
+    url: str = None
+    name: str = None
+
+class GenericRequest(BaseModel):
+    op: str
+    path: List[str]
+
+@app.post('/configure')
 @auth_required
-def configure_op(commands):
-    session = app.config['vyos_session']
+def configure_op(*, key: str = Form(...),
+                    data: Json[Union[ConfigureRequest,List[ConfigureRequest]]] = Form(...),
+                    strict: str = Form(None)):
+
+    session = app.state.vyos_session
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
 
-    strict_field = request.form.get("strict")
-    if strict_field == "true":
-        strict = True
+    if strict == "true":
+        strict_bool = True
     else:
-        strict = False
+        strict_bool = False
 
     # Allow users to pass just one command
-    if not isinstance(commands, list):
-        commands = [commands]
+    if not isinstance(data, list):
+        data = [data]
 
     # We don't want multiple people/apps to be able to commit at once,
     # or modify the shared session while someone else is doing the same,
@@ -114,41 +132,20 @@ def configure_op(commands):
     status = 200
     error_msg = None
     try:
-        for c in commands:
-            # What we've got may not even be a dict
-            if not isinstance(c, dict):
-                raise ConfigSessionError("Malformed command \"{0}\": any command must be a dict".format(json.dumps(c)))
+        for c in data:
 
-            # Missing op or path is a show stopper
-            if not ('op' in c):
-                raise ConfigSessionError("Malformed command \"{0}\": missing \"op\" field".format(json.dumps(c)))
-            if not ('path' in c):
-                raise ConfigSessionError("Malformed command \"{0}\": missing \"path\" field".format(json.dumps(c)))
-
-            # Missing value is fine, substitute for empty string
-            if 'value' in c:
-                value = c['value']
+            if c.value:
+                value = c.value
             else:
                 value = ""
 
-            op = c['op']
-            path = c['path']
+            op = c.op
+            path = c.path
 
-            if not path:
-                raise ConfigSessionError("Malformed command \"{0}\": empty path".format(json.dumps(c)))
-
-            # Type checking
-            if not isinstance(path, list):
-                raise ConfigSessionError("Malformed command \"{0}\": \"path\" field must be a list".format(json.dumps(c)))
-
-            if not isinstance(value, str):
-                raise ConfigSessionError("Malformed command \"{0}\": \"value\" field must be a string".format(json.dumps(c)))
-
-            # Account for the case when value field is present and set to null
             if not value:
                 value = ""
 
-            # For vyos.configsessios calls that have no separate value arguments,
+            # For vyos.configsession calls that have no separate value arguments,
             # and for type checking too
             try:
                 cfg_path = " ".join(path + [value]).strip()
@@ -160,7 +157,7 @@ def configure_op(commands):
                 # but there's probably no way to do that
                 session.set(path, value=value)
             elif op == 'delete':
-                if strict and not config.exists(cfg_path):
+                if strict_bool and not config.exists(cfg_path):
                     raise ConfigSessionError("Cannot delete [{0}]: path/value does not exist".format(cfg_path))
                 session.delete(path, value=value)
             elif op == 'comment':
@@ -173,7 +170,7 @@ def configure_op(commands):
     except ConfigSessionError as e:
         session.discard()
         status = 400
-        if app.config['vyos_debug']:
+        if app.state.vyos_debug:
             print(traceback.format_exc(), file=sys.stderr)
         error_msg = str(e)
     except Exception as e:
@@ -191,19 +188,15 @@ def configure_op(commands):
     else:
         return success(None)
 
-@app.route('/retrieve', methods=['POST'])
-@get_command
+@app.post("/retrieve")
 @auth_required
-def retrieve_op(command):
-    session = app.config['vyos_session']
+def retrieve_op(*, key: str = Form(...), data: Json[RetrieveRequest] = Form(...)):
+    session = app.state.vyos_session
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
 
-    try:
-        op = command['op']
-        path = " ".join(command['path'])
-    except KeyError:
-        return error(400, "Missing required field. \"op\" and \"path\" fields are required")
+    op = data.op
+    path = " ".join(data.path)
 
     try:
         if op == 'returnValue':
@@ -214,10 +207,10 @@ def retrieve_op(command):
             res = config.exists(path)
         elif op == 'showConfig':
             config_format = 'json'
-            if 'configFormat' in command:
-                config_format = command['configFormat']
+            if data.configFormat:
+                config_format = data.configFormat
 
-            res = session.show_config(path=command['path'])
+            res = session.show_config(path=data.path)
             if config_format == 'json':
                 config_tree = vyos.configtree.ConfigTree(res)
                 res = json.loads(config_tree.to_json())
@@ -238,28 +231,24 @@ def retrieve_op(command):
 
     return success(res)
 
-@app.route('/config-file', methods=['POST'])
-@get_command
+@app.post('/config-file')
 @auth_required
-def config_file_op(command):
-    session = app.config['vyos_session']
+def config_file_op(*, key: str = Form(...), data: Json[ConfigFileRequest] = Form(...)):
+    session = app.state.vyos_session
 
-    try:
-        op = command['op']
-    except KeyError:
-        return error(400, "Missing required field \"op\"")
+    op = data.op
 
     try:
         if op == 'save':
-            try:
-                path = command['file']
-            except KeyError:
+            if data.file:
+                path = data.file
+            else:
                 path = '/config/config.boot'
             res = session.save_config(path)
         elif op == 'load':
-            try:
-                path = command['file']
-            except KeyError:
+            if data.file:
+                path = data.file
+            else:
                 return error(400, "Missing required field \"file\"")
             res = session.migrate_and_load_config(path)
             res = session.commit()
@@ -273,28 +262,24 @@ def config_file_op(command):
 
     return success(res)
 
-@app.route('/image', methods=['POST'])
-@get_command
+@app.post('/image')
 @auth_required
-def image_op(command):
-    session = app.config['vyos_session']
+def image_op(*, key: str = Form(...), data: Json[ImageRequest] = Form(...)):
+    session = app.state.vyos_session
 
-    try:
-        op = command['op']
-    except KeyError:
-        return error(400, "Missing required field \"op\"")
+    op = data.op
 
     try:
         if op == 'add':
-            try:
-                url = command['url']
-            except KeyError:
+            if data.url:
+                url = data.url
+            else:
                 return error(400, "Missing required field \"url\"")
             res = session.install_image(url)
         elif op == 'delete':
-            try:
-                name = command['name']
-            except KeyError:
+            if data.name:
+                name = data.name
+            else:
                 return error(400, "Missing required field \"name\"")
             res = session.remove_image(name)
         else:
@@ -307,18 +292,13 @@ def image_op(command):
 
     return success(res)
 
-
-@app.route('/generate', methods=['POST'])
-@get_command
+@app.post('/generate')
 @auth_required
-def generate_op(command):
-    session = app.config['vyos_session']
+def generate_op(*, key: str = Form(...), data: Json[GenericRequest] = Form(...)):
+    session = app.state.vyos_session
 
-    try:
-        op = command['op']
-        path = command['path']
-    except KeyError:
-        return error(400, "Missing required field. \"op\" and \"path\" fields are required")
+    op = data.op
+    path = data.path
 
     if not isinstance(path, list):
         return error(400, "Malformed command: \"path\" field must be a list of strings")
@@ -336,17 +316,13 @@ def generate_op(command):
 
     return success(res)
 
-@app.route('/show', methods=['POST'])
-@get_command
+@app.post('/show')
 @auth_required
-def show_op(command):
-    session = app.config['vyos_session']
+def show_op(*, key: str = Form(...), data: Json[GenericRequest] = Form(...)):
+    session = app.state.vyos_session
 
-    try:
-        op = command['op']
-        path = command['path']
-    except KeyError:
-        return error(400, "Missing required field. \"op\" and \"path\" fields are required")
+    op = data.op
+    path = data.path
 
     if not isinstance(path, list):
         return error(400, "Malformed command: \"path\" field must be a list of strings")
@@ -363,9 +339,6 @@ def show_op(command):
         return error(500, "An internal error occured. Check the logs for details.")
 
     return success(res)
-
-def shutdown():
-    raise KeyboardInterrupt
 
 if __name__ == '__main__':
     # systemd's user and group options don't work, do it by hand here,
@@ -384,17 +357,13 @@ if __name__ == '__main__':
 
     session = ConfigSession(os.getpid())
 
-    app.config['vyos_session'] = session
-    app.config['vyos_keys'] = server_config['api_keys']
-    app.config['vyos_debug'] = server_config['debug']
-
-    def sig_handler(signum, frame):
-        shutdown()
-
-    signal.signal(signal.SIGTERM, sig_handler)
+    app.state.vyos_session = session
+    app.state.vyos_keys = server_config['api_keys']
+    app.state.vyos_debug = server_config['debug']
 
     try:
-        serve(app, host=server_config["listen_address"],
-                   port=server_config["port"])
+        uvicorn.run(app, host=server_config["listen_address"],
+                         port=int(server_config["port"]),
+                         proxy_headers=True)
     except OSError as e:
         print(f"OSError {e}")
