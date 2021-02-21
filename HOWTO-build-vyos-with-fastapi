@@ -1,0 +1,7 @@
+
+wget http://aptly.euporia.xyz/key.pub
+
+./configure --custom-apt-entry 'deb http://aptly.euporia.xyz stable main' --custom-apt-key key.pub --custom-package vyos-http-api-tools 
+
+
+
