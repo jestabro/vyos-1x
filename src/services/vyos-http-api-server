@@ -20,6 +20,7 @@ import os
 import sys
 import grp
 import json
+import time
 import logging
 import traceback
 import threading
@@ -27,10 +28,12 @@ from functools import wraps
 from typing import List, Union
 
 import uvicorn
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Depends, Request, Form, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Json
+
+from starlette.responses import RedirectResponse
 
 import vyos.config
 
@@ -53,7 +56,7 @@ else:
 
 app = FastAPI(debug=True,
               title="VyOS API",
-              version="0.1.0")
+              version="0.2.0")
 
 # Giant lock!
 lock = threading.Lock()
@@ -78,53 +81,48 @@ def success(data):
     resp = {"success": True, "data": data, "error": None}
     return JSONResponse(resp)
 
-def auth_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        key = kwargs['key']
-        api_keys = app.state.vyos_keys
-        id = check_auth(api_keys, key)
-        if not id:
-            return error(401, "Valid API key is required")
-        return f(*args, **kwargs)
-
-    return decorated_function
-
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     return error(400, str(exc))
 
 # Pydantic models for validation
 
-class ConfigureRequest(BaseModel):
+class ApiRequest(BaseModel):
+    id: str = None
+    key: str
+
+class ConfigureRequest(ApiRequest):
     op: str
     path: List[str]
     value: str = None
 
-class RetrieveRequest(BaseModel):
+class RetrieveRequest(ApiRequest):
     op: str
     path: List[str]
     configFormat: str = None
 
-class ConfigFileRequest(BaseModel):
+class ConfigFileRequest(ApiRequest):
     op: str
     file: str = None
 
-class ImageRequest(BaseModel):
+class ImageRequest(ApiRequest):
     op: str
     url: str = None
     name: str = None
 
-class GenericRequest(BaseModel):
+class GenericRequest(ApiRequest):
     op: str
     path: List[str]
 
-@app.post('/configure')
-@auth_required
-def configure_op(*, key: str = Form(...),
-                    data: Json[Union[ConfigureRequest,List[ConfigureRequest]]] = Form(...),
-                    strict: str = Form(None)):
+def auth_required(data: ApiRequest):
+    key = data.key
+    api_keys = app.state.vyos_keys
+    id = check_auth(api_keys, key)
+    if not id:
+        raise HTTPException(status_code=401, detail="Valid API key is required")
 
+@app.post('/configure', dependencies=[Depends(auth_required)])
+def configure_op(data: ConfigureRequest):
     session = app.state.vyos_session
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
@@ -202,9 +200,8 @@ def configure_op(*, key: str = Form(...),
     else:
         return success(None)
 
-@app.post("/retrieve")
-@auth_required
-def retrieve_op(*, key: str = Form(...), data: Json[RetrieveRequest] = Form(...)):
+@app.post("/retrieve", dependencies=[Depends(auth_required)])
+def retrieve_op(data: RetrieveRequest):
     session = app.state.vyos_session
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
@@ -245,9 +242,8 @@ def retrieve_op(*, key: str = Form(...), data: Json[RetrieveRequest] = Form(...)
 
     return success(res)
 
-@app.post('/config-file')
-@auth_required
-def config_file_op(*, key: str = Form(...), data: Json[ConfigFileRequest] = Form(...)):
+@app.post('/config-file', dependencies=[Depends(auth_required)])
+def config_file_op(data: ConfigFileRequest):
     session = app.state.vyos_session
 
     op = data.op
@@ -276,9 +272,8 @@ def config_file_op(*, key: str = Form(...), data: Json[ConfigFileRequest] = Form
 
     return success(res)
 
-@app.post('/image')
-@auth_required
-def image_op(*, key: str = Form(...), data: Json[ImageRequest] = Form(...)):
+@app.post('/image', dependencies=[Depends(auth_required)])
+def image_op(data: ImageRequest):
     session = app.state.vyos_session
 
     op = data.op
@@ -306,9 +301,8 @@ def image_op(*, key: str = Form(...), data: Json[ImageRequest] = Form(...)):
 
     return success(res)
 
-@app.post('/generate')
-@auth_required
-def generate_op(*, key: str = Form(...), data: Json[GenericRequest] = Form(...)):
+@app.post('/generate', dependencies=[Depends(auth_required)])
+def generate_op(data: GenericRequest):
     session = app.state.vyos_session
 
     op = data.op
@@ -330,9 +324,8 @@ def generate_op(*, key: str = Form(...), data: Json[GenericRequest] = Form(...))
 
     return success(res)
 
-@app.post('/show')
-@auth_required
-def show_op(*, key: str = Form(...), data: Json[GenericRequest] = Form(...)):
+@app.post('/show', dependencies=[Depends(auth_required)])
+def show_op(data: GenericRequest):
     session = app.state.vyos_session
 
     op = data.op
