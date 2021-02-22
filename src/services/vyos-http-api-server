@@ -20,6 +20,7 @@ import os
 import sys
 import grp
 import json
+import logging
 import traceback
 import threading
 from functools import wraps
@@ -37,6 +38,18 @@ from vyos.configsession import ConfigSession, ConfigSessionError
 
 DEFAULT_CONFIG_FILE = '/etc/vyos/http-api.conf'
 CFG_GROUP = 'vyattacfg'
+
+debug = True
+
+logger = logging.getLogger(__name__)
+logs_handler = logging.StreamHandler()
+logger.addHandler(logs_handler)
+
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+
 
 app = FastAPI(debug=True,
               title="VyOS API",
@@ -167,16 +180,16 @@ def configure_op(*, key: str = Form(...),
                 raise ConfigSessionError("\"{0}\" is not a valid operation".format(op))
         # end for
         session.commit()
-        print("Configuration modified via HTTP API using key \"{0}\"".format(id))
+        logger.info("Configuration modified via HTTP API using key \"{0}\"".format(id))
     except ConfigSessionError as e:
         session.discard()
         status = 400
         if app.state.vyos_debug:
-            print(traceback.format_exc(), file=sys.stderr)
+            logger.critical(f"ConfigSessionError:\n {traceback.format_exc()}")
         error_msg = str(e)
     except Exception as e:
         session.discard()
-        print(traceback.format_exc(), file=sys.stderr)
+        logger.critical(traceback.format_exc())
         status = 500
 
         # Don't give the details away to the outer world
@@ -227,7 +240,7 @@ def retrieve_op(*, key: str = Form(...), data: Json[RetrieveRequest] = Form(...)
     except ConfigSessionError as e:
         return error(400, str(e))
     except Exception as e:
-        print(traceback.format_exc(), file=sys.stderr)
+        logger.critical(traceback.format_exc())
         return error(500, "An internal error occured. Check the logs for details.")
 
     return success(res)
@@ -258,7 +271,7 @@ def config_file_op(*, key: str = Form(...), data: Json[ConfigFileRequest] = Form
     except ConfigSessionError as e:
         return error(400, str(e))
     except Exception as e:
-        print(traceback.format_exc(), file=sys.stderr)
+        logger.critical(traceback.format_exc())
         return error(500, "An internal error occured. Check the logs for details.")
 
     return success(res)
@@ -288,7 +301,7 @@ def image_op(*, key: str = Form(...), data: Json[ImageRequest] = Form(...)):
     except ConfigSessionError as e:
         return error(400, str(e))
     except Exception as e:
-        print(traceback.format_exc(), file=sys.stderr)
+        logger.critical(traceback.format_exc())
         return error(500, "An internal error occured. Check the logs for details.")
 
     return success(res)
@@ -312,7 +325,7 @@ def generate_op(*, key: str = Form(...), data: Json[GenericRequest] = Form(...))
     except ConfigSessionError as e:
         return error(400, str(e))
     except Exception as e:
-        print(traceback.format_exc(), file=sys.stderr)
+        logger.critical(traceback.format_exc())
         return error(500, "An internal error occured. Check the logs for details.")
 
     return success(res)
@@ -336,7 +349,7 @@ def show_op(*, key: str = Form(...), data: Json[GenericRequest] = Form(...)):
     except ConfigSessionError as e:
         return error(400, str(e))
     except Exception as e:
-        print(traceback.format_exc(), file=sys.stderr)
+        logger.critical(traceback.format_exc())
         return error(500, "An internal error occured. Check the logs for details.")
 
     return success(res)
@@ -354,7 +367,7 @@ if __name__ == '__main__':
     try:
         server_config = load_server_config()
     except Exception as e:
-        print("Failed to load the HTTP API server config: {0}".format(e))
+        logger.critical("Failed to load the HTTP API server config: {0}".format(e))
 
     session = ConfigSession(os.getpid())
 
@@ -367,4 +380,5 @@ if __name__ == '__main__':
                          port=int(server_config["port"]),
                          proxy_headers=True)
     except OSError as e:
-        print(f"OSError {e}")
+        logger.critical(f"OSError {e}")
+        sys.exit(1)
