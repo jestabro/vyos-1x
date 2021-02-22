@@ -5,7 +5,7 @@ Requires=vyos-router.service
 
 [Service]
 ExecStartPre=/usr/libexec/vyos/init/vyos-config
-ExecStart=/usr/share/vyos-http-api-tools/bin/python3 -u /usr/libexec/vyos/services/vyos-http-api-server
+ExecStart=/usr/libexec/vyos/services/vyos-http-api-server
 Type=idle
 
 SyslogIdentifier=vyos-http-api
