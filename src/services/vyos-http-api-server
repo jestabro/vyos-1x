@@ -87,34 +87,34 @@ async def validation_exception_handler(request, exc):
 
 # Pydantic models for validation
 
-class ApiRequest(BaseModel):
+class ApiModel(BaseModel):
     id: str = None
     key: str
 
-class ConfigureRequest(ApiRequest):
+class ConfigureModel(ApiModel):
     op: str
     path: List[str]
     value: str = None
 
-class RetrieveRequest(ApiRequest):
+class RetrieveModel(ApiModel):
     op: str
     path: List[str]
     configFormat: str = None
 
-class ConfigFileRequest(ApiRequest):
+class ConfigFileModel(ApiModel):
     op: str
     file: str = None
 
-class ImageRequest(ApiRequest):
+class ImageModel(ApiModel):
     op: str
     url: str = None
     name: str = None
 
-class GenericRequest(ApiRequest):
+class GenericModel(ApiModel):
     op: str
     path: List[str]
 
-def auth_required(data: ApiRequest):
+def auth_required(data: ApiModel):
     key = data.key
     api_keys = app.state.vyos_keys
     id = check_auth(api_keys, key)
@@ -122,7 +122,7 @@ def auth_required(data: ApiRequest):
         raise HTTPException(status_code=401, detail="Valid API key is required")
 
 @app.post('/configure', dependencies=[Depends(auth_required)])
-def configure_op(data: ConfigureRequest):
+def configure_op(data: ConfigureModel):
     session = app.state.vyos_session
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
@@ -201,7 +201,7 @@ def configure_op(data: ConfigureRequest):
         return success(None)
 
 @app.post("/retrieve", dependencies=[Depends(auth_required)])
-def retrieve_op(data: RetrieveRequest):
+def retrieve_op(data: RetrieveModel):
     session = app.state.vyos_session
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
@@ -243,7 +243,7 @@ def retrieve_op(data: RetrieveRequest):
     return success(res)
 
 @app.post('/config-file', dependencies=[Depends(auth_required)])
-def config_file_op(data: ConfigFileRequest):
+def config_file_op(data: ConfigFileModel):
     session = app.state.vyos_session
 
     op = data.op
@@ -273,7 +273,7 @@ def config_file_op(data: ConfigFileRequest):
     return success(res)
 
 @app.post('/image', dependencies=[Depends(auth_required)])
-def image_op(data: ImageRequest):
+def image_op(data: ImageModel):
     session = app.state.vyos_session
 
     op = data.op
@@ -302,7 +302,7 @@ def image_op(data: ImageRequest):
     return success(res)
 
 @app.post('/generate', dependencies=[Depends(auth_required)])
-def generate_op(data: GenericRequest):
+def generate_op(data: GenericModel):
     session = app.state.vyos_session
 
     op = data.op
@@ -325,7 +325,7 @@ def generate_op(data: GenericRequest):
     return success(res)
 
 @app.post('/show', dependencies=[Depends(auth_required)])
-def show_op(data: GenericRequest):
+def show_op(data: GenericModel):
     session = app.state.vyos_session
 
     op = data.op
