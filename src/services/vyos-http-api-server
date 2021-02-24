@@ -85,7 +85,6 @@ async def validation_exception_handler(request, exc):
 # Pydantic models for validation
 
 class ApiModel(BaseModel):
-    id: str = None
     key: str
 
 class ConfigureModel(ApiModel):
@@ -117,6 +116,7 @@ def auth_required(data: ApiModel):
     id = check_auth(api_keys, key)
     if not id:
         raise HTTPException(status_code=401, detail="Valid API key is required")
+    app.state.vyos_id = id
 
 # override Request and APIRoute classes in order to convert form request to json
 class MultipartRequest(Request):
@@ -156,11 +156,6 @@ def configure_op(data: ConfigureModel):
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
 
-    if strict == "true":
-        strict_bool = True
-    else:
-        strict_bool = False
-
     # Allow users to pass just one command
     if not isinstance(data, list):
         data = [data]
@@ -198,7 +193,7 @@ def configure_op(data: ConfigureModel):
                 # but there's probably no way to do that
                 session.set(path, value=value)
             elif op == 'delete':
-                if strict_bool and not config.exists(cfg_path):
+                if app.state.vyos_strict and not config.exists(cfg_path):
                     raise ConfigSessionError("Cannot delete [{0}]: path/value does not exist".format(cfg_path))
                 session.delete(path, value=value)
             elif op == 'comment':
@@ -207,7 +202,7 @@ def configure_op(data: ConfigureModel):
                 raise ConfigSessionError("\"{0}\" is not a valid operation".format(op))
         # end for
         session.commit()
-        logger.info("Configuration modified via HTTP API using key \"{0}\"".format(id))
+        logger.info(f"Configuration modified via HTTP API using key '{app.state.vyos_id}'")
     except ConfigSessionError as e:
         session.discard()
         status = 400
@@ -395,7 +390,16 @@ if __name__ == '__main__':
 
     app.state.vyos_session = session
     app.state.vyos_keys = server_config['api_keys']
-    app.state.vyos_debug = server_config['debug']
+
+    if server_config['debug'] == 'true':
+        app.state.vyos_debug = True
+    else:
+        app.state.vyos_debug = False
+
+    if server_config['strict'] == 'true':
+        app.state.vyos_strict = True
+    else:
+        app.state.vyos_strict = False
 
     try:
         uvicorn.run(app, host=server_config["listen_address"],
