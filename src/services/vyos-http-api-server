@@ -25,12 +25,13 @@ import logging
 import traceback
 import threading
 from functools import wraps
-from typing import List, Union
+from typing import List, Union, Optional, Callable
 
 import uvicorn
-from fastapi import FastAPI, Depends, Request, Form, HTTPException
+from fastapi import FastAPI, Depends, Body, Request, Response, Form, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, Json
 
 from starlette.responses import RedirectResponse
@@ -120,6 +121,38 @@ def auth_required(data: ApiModel):
     id = check_auth(api_keys, key)
     if not id:
         raise HTTPException(status_code=401, detail="Valid API key is required")
+
+# override Request and APIRoute classes in order to convert form request to json
+class MultipartRequest(Request):
+    async def body(self) -> bytes:
+        if not hasattr(self, "_body"):
+            tmp = {}
+            body = await super().body()
+            self._body = body
+            form_data = await self.form()
+            if form_data:
+                for k, v in form_data.multi_items():
+                    tmp[k] = v
+                merge = json.loads(tmp['data'])
+                if 'key' in tmp:
+                    merge['key'] = tmp['key']
+                new_body = json.dumps(merge)
+                new_body = new_body.encode()
+                self._body = new_body
+
+        return self._body
+
+class MultipartRoute(APIRoute):
+    def get_route_handler(self) -> Callable:
+        original_route_handler = super().get_route_handler()
+
+        async def custom_route_handler(request: Request) -> Response:
+            request = MultipartRequest(request.scope, request.receive)
+            return await original_route_handler(request)
+
+        return custom_route_handler
+
+app.router.route_class = MultipartRoute
 
 @app.post('/configure', dependencies=[Depends(auth_required)])
 def configure_op(data: ConfigureModel):
