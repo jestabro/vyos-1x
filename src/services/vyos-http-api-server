@@ -20,21 +20,17 @@ import os
 import sys
 import grp
 import json
-import time
 import logging
 import traceback
 import threading
-from functools import wraps
-from typing import List, Union, Optional, Callable
+from typing import List, Callable
 
 import uvicorn
-from fastapi import FastAPI, Depends, Body, Request, Response, Form, HTTPException
+from fastapi import FastAPI, Depends, Request, Response, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
-from pydantic import BaseModel, Json
-
-from starlette.responses import RedirectResponse
+from pydantic import BaseModel
 
 import vyos.config
 
