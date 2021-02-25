@@ -23,7 +23,7 @@ import json
 import logging
 import traceback
 import threading
-from typing import List, Callable
+from typing import List, Union, Callable
 
 import uvicorn
 from fastapi import FastAPI, Depends, Request, Response, HTTPException
@@ -87,10 +87,18 @@ async def validation_exception_handler(request, exc):
 class ApiModel(BaseModel):
     key: str
 
+class BaseConfigureModel(BaseModel):
+    op: str
+    path: List[str]
+    value: str = None
+
 class ConfigureModel(ApiModel):
     op: str
     path: List[str]
     value: str = None
+
+class ConfigureListModel(ApiModel):
+    commands: List[BaseConfigureModel]
 
 class RetrieveModel(ApiModel):
     op: str
@@ -122,16 +130,24 @@ def auth_required(data: ApiModel):
 class MultipartRequest(Request):
     async def body(self) -> bytes:
         if not hasattr(self, "_body"):
-            tmp = {}
+            forms = {}
+            merge = {}
             body = await super().body()
             self._body = body
             form_data = await self.form()
             if form_data:
                 for k, v in form_data.multi_items():
-                    tmp[k] = v
-                merge = json.loads(tmp['data'])
-                if 'key' in tmp:
-                    merge['key'] = tmp['key']
+                    forms[k] = v
+                if 'data' not in forms:
+                    return self._body
+                tmp = json.loads(forms['data'])
+                if isinstance(tmp, list):
+                    merge['commands'] = tmp
+                else:
+                    merge = tmp
+                logger.debug(f"JSE merge {merge}")
+                if 'key' in forms:
+                    merge['key'] = forms['key']
                 new_body = json.dumps(merge)
                 new_body = new_body.encode()
                 self._body = new_body
@@ -151,14 +167,16 @@ class MultipartRoute(APIRoute):
 app.router.route_class = MultipartRoute
 
 @app.post('/configure', dependencies=[Depends(auth_required)])
-def configure_op(data: ConfigureModel):
+def configure_op(data: Union[ConfigureModel, ConfigureListModel]):
     session = app.state.vyos_session
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
 
     # Allow users to pass just one command
-    if not isinstance(data, list):
+    if not isinstance(data, ConfigureListModel):
         data = [data]
+    else:
+        data = data.commands
 
     # We don't want multiple people/apps to be able to commit at once,
     # or modify the shared session while someone else is doing the same,
