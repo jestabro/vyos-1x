@@ -23,13 +23,12 @@ import json
 import logging
 import traceback
 import threading
-from typing import List, Union, Callable, Any
+from typing import List, Union, Callable
 
 import uvicorn
-from fastapi import APIRouter, FastAPI, Depends, Request, Response, HTTPException
+from fastapi import FastAPI, Depends, Request, Response, HTTPException
+from fastapi.responses import PlainTextResponse, HTMLResponse
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import PlainTextResponse
-from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
@@ -263,8 +262,8 @@ def configure_op(data: Union[ConfigureModel, ConfigureListModel]):
 
     if status != 200:
         return error(status, error_msg)
-    else:
-        return success(None)
+
+    return success(None)
 
 @app.post("/retrieve", dependencies=[Depends(auth_required)])
 def retrieve_op(data: RetrieveModel):
@@ -436,15 +435,8 @@ if __name__ == '__main__':
     app.state.vyos_session = session
     app.state.vyos_keys = server_config['api_keys']
 
-    if server_config['debug'] == 'true':
-        app.state.vyos_debug = True
-    else:
-        app.state.vyos_debug = False
-
-    if server_config['strict'] == 'true':
-        app.state.vyos_strict = True
-    else:
-        app.state.vyos_strict = False
+    app.state.vyos_debug = True if server_config['debug'] == 'true' else False
+    app.state.vyos_strict = True if server_config['strict'] == 'true' else False
 
     try:
         uvicorn.run(app, host=server_config["listen_address"],
