@@ -28,6 +28,7 @@ from typing import List, Union, Callable, Any
 import uvicorn
 from fastapi import APIRouter, FastAPI, Depends, Request, Response, HTTPException
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import PlainTextResponse
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
@@ -83,7 +84,7 @@ def success(data):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
-    return error(400, str(exc))
+    return PlainTextResponse(str(exc), status_code=400)
 
 # Pydantic models for validation
 
@@ -154,9 +155,9 @@ class MultipartRequest(Request):
                     else:
                         merge = tmp
 
-                if 'key' not in forms:
+                if 'key' not in forms and 'key' not in merge:
                     self.ERR_MISSING_KEY = True
-                else:
+                if 'key' in forms and 'key' not in merge:
                     merge['key'] = forms['key']
 
                 new_body = json.dumps(merge)
@@ -176,13 +177,11 @@ class MultipartRoute(APIRoute):
             except HTTPException as e:
                 return error(e.status_code, e.detail)
             except Exception as e:
-                print(f"JSE error {e}")
-#                pass
-
                 if request.ERR_MISSING_KEY:
                     return error(422, "Valid API key is required")
                 if request.ERR_MISSING_DATA:
                     return error(422, "Non-empty data field is required")
+
                 raise e
 
             return response
