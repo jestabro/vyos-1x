@@ -23,12 +23,12 @@ import json
 import logging
 import traceback
 import threading
-from typing import List, Union, Callable
+from typing import List, Union, Callable, Any
 
 import uvicorn
-from fastapi import FastAPI, Depends, Request, Response, HTTPException
+from fastapi import APIRouter, FastAPI, Depends, Request, Response, HTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
@@ -72,11 +72,14 @@ def check_auth(key_list, key):
 
 def error(code, msg):
     resp = {"success": False, "error": msg, "data": None}
-    return JSONResponse(resp, status_code=code)
+    resp = json.dumps(resp)
+    return HTMLResponse(resp, status_code=code)
 
+# add HTMLResponse; delete raw_error an VyJResponse
 def success(data):
     resp = {"success": True, "data": data, "error": None}
-    return JSONResponse(resp)
+    resp = json.dumps(resp)
+    return HTMLResponse(resp)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
@@ -128,26 +131,34 @@ def auth_required(data: ApiModel):
 
 # override Request and APIRoute classes in order to convert form request to json
 class MultipartRequest(Request):
+    ERR_MISSING_KEY = False
+    ERR_MISSING_DATA = False
     async def body(self) -> bytes:
         if not hasattr(self, "_body"):
             forms = {}
             merge = {}
             body = await super().body()
             self._body = body
+
             form_data = await self.form()
             if form_data:
                 for k, v in form_data.multi_items():
                     forms[k] = v
+
                 if 'data' not in forms:
-                    return self._body
-                tmp = json.loads(forms['data'])
-                if isinstance(tmp, list):
-                    merge['commands'] = tmp
+                    self.ERR_MISSING_DATA = True
                 else:
-                    merge = tmp
-                logger.debug(f"JSE merge {merge}")
-                if 'key' in forms:
+                    tmp = json.loads(forms['data'])
+                    if isinstance(tmp, list):
+                        merge['commands'] = tmp
+                    else:
+                        merge = tmp
+
+                if 'key' not in forms:
+                    self.ERR_MISSING_KEY = True
+                else:
                     merge['key'] = forms['key']
+
                 new_body = json.dumps(merge)
                 new_body = new_body.encode()
                 self._body = new_body
@@ -160,7 +171,16 @@ class MultipartRoute(APIRoute):
 
         async def custom_route_handler(request: Request) -> Response:
             request = MultipartRequest(request.scope, request.receive)
-            return await original_route_handler(request)
+            try:
+                response: Response = await original_route_handler(request)
+            except HTTPException as e:
+                return error(e.status_code, e.detail)
+            except Exception as e:
+                if request.ERR_MISSING_KEY:
+                    return error(422, "Valid API key is required")
+                if request.ERR_MISSING_DATA:
+                    return error(422, "Non-empty data field is required")
+            return response
 
         return custom_route_handler
 
@@ -248,8 +268,11 @@ def retrieve_op(data: RetrieveModel):
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
 
-    op = data.op
-    path = " ".join(data.path)
+    try:
+        op = data.op
+        path = " ".join(data.path)
+    except KeyError:
+        return error(400, "Missing required field. \"op\" and \"path\" fields are required")
 
     try:
         if op == 'returnValue':
