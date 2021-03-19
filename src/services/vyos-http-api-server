@@ -75,7 +75,6 @@ def error(code, msg):
     resp = json.dumps(resp)
     return HTMLResponse(resp, status_code=code)
 
-# add HTMLResponse; delete raw_error an VyJResponse
 def success(data):
     resp = {"success": True, "data": data, "error": None}
     resp = json.dumps(resp)
@@ -271,11 +270,8 @@ def retrieve_op(data: RetrieveModel):
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
 
-    try:
-        op = data.op
-        path = " ".join(data.path)
-    except KeyError:
-        return error(400, "Missing required field. \"op\" and \"path\" fields are required")
+    op = data.op
+    path = " ".join(data.path)
 
     try:
         if op == 'returnValue':
@@ -376,9 +372,6 @@ def generate_op(data: GenericModel):
     op = data.op
     path = data.path
 
-    if not isinstance(path, list):
-        return error(400, "Malformed command: \"path\" field must be a list of strings")
-
     try:
         if op == 'generate':
             res = session.generate(path)
@@ -398,9 +391,6 @@ def show_op(data: GenericModel):
 
     op = data.op
     path = data.path
-
-    if not isinstance(path, list):
-        return error(400, "Malformed command: \"path\" field must be a list of strings")
 
     try:
         if op == 'show':
