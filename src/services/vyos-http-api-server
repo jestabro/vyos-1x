@@ -23,7 +23,7 @@ import json
 import logging
 import traceback
 import threading
-from typing import List, Union, Callable
+from typing import List, Union, Callable, Dict
 
 import uvicorn
 from fastapi import FastAPI, Depends, Request, Response, HTTPException
@@ -50,11 +50,6 @@ if debug:
 else:
     logger.setLevel(logging.INFO)
 
-
-app = FastAPI(debug=True,
-              title="VyOS API",
-              version="0.1.0")
-
 # Giant lock!
 lock = threading.Lock()
 
@@ -80,10 +75,6 @@ def success(data):
     resp = json.dumps(resp)
     return HTMLResponse(resp)
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
-    return PlainTextResponse(str(exc), status_code=400)
-
 # Pydantic models for validation
 
 class ApiModel(BaseModel):
@@ -99,26 +90,112 @@ class ConfigureModel(ApiModel):
     path: List[str]
     value: str = None
 
+    class Config:
+        schema_extra = {
+            "example": {
+                "key": "id_key",
+                "op": "set | delete | comment",
+                "path": ['config', 'mode', 'path'],
+            }
+        }
+
 class ConfigureListModel(ApiModel):
     commands: List[BaseConfigureModel]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "key": "id_key",
+                "commands": "list",
+            }
+        }
 
 class RetrieveModel(ApiModel):
     op: str
     path: List[str]
     configFormat: str = None
 
+    class Config:
+        schema_extra = {
+            "example": {
+                "key": "id_key",
+                "op": "returnValue | returnValues | exists | showConfig",
+                "path": ['config', 'mode', 'path'],
+                "configFormat": "json (default) | json_ast | raw",
+
+            }
+        }
+
 class ConfigFileModel(ApiModel):
     op: str
     file: str = None
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "key": "id_key",
+                "op": "save | load",
+                "file": "filename",
+            }
+        }
 
 class ImageModel(ApiModel):
     op: str
     url: str = None
     name: str = None
 
-class GenericModel(ApiModel):
+    class Config:
+        schema_extra = {
+            "example": {
+                "key": "id_key",
+                "op": "add | delete",
+                "url": "imagelocation",
+                "name": "imagename",
+            }
+        }
+
+class GenerateModel(ApiModel):
     op: str
     path: List[str]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "key": "id_key",
+                "op": "generate",
+                "path": ["op", "mode", "path"],
+            }
+        }
+
+class ShowModel(ApiModel):
+    op: str
+    path: List[str]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "key": "id_key",
+                "op": "show",
+                "path": ["op", "mode", "path"],
+            }
+        }
+
+class Success(BaseModel):
+    success: bool
+    data: Union[str, bool, Dict]
+    error: str
+
+class Error(BaseModel):
+    success: bool = False
+    data: Union[str, bool, Dict]
+    error: str
+
+responses = {
+    200: {'model': Success},
+    400: {'model': Error},
+    422: {'model': Error, 'description': 'Validation Error'},
+    500: {'model': Error}
+}
 
 def auth_required(data: ApiModel):
     key = data.key
@@ -141,6 +218,7 @@ class MultipartRequest(Request):
 
             form_data = await self.form()
             if form_data:
+                logger.debug("processing form data")
                 for k, v in form_data.multi_items():
                     forms[k] = v
 
@@ -186,9 +264,19 @@ class MultipartRoute(APIRoute):
 
         return custom_route_handler
 
+app = FastAPI(debug=True,
+              title="VyOS API",
+              version="0.1.0",
+              responses={**responses},
+              dependencies=[Depends(auth_required)])
+
 app.router.route_class = MultipartRoute
 
-@app.post('/configure', dependencies=[Depends(auth_required)])
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return error(400, str(exc.errors()[0]))
+
+@app.post('/configure')
 def configure_op(data: Union[ConfigureModel, ConfigureListModel]):
     session = app.state.vyos_session
     env = session.get_session_env()
@@ -264,7 +352,7 @@ def configure_op(data: Union[ConfigureModel, ConfigureListModel]):
 
     return success(None)
 
-@app.post("/retrieve", dependencies=[Depends(auth_required)])
+@app.post("/retrieve")
 def retrieve_op(data: RetrieveModel):
     session = app.state.vyos_session
     env = session.get_session_env()
@@ -306,7 +394,7 @@ def retrieve_op(data: RetrieveModel):
 
     return success(res)
 
-@app.post('/config-file', dependencies=[Depends(auth_required)])
+@app.post('/config-file')
 def config_file_op(data: ConfigFileModel):
     session = app.state.vyos_session
 
@@ -336,7 +424,7 @@ def config_file_op(data: ConfigFileModel):
 
     return success(res)
 
-@app.post('/image', dependencies=[Depends(auth_required)])
+@app.post('/image')
 def image_op(data: ImageModel):
     session = app.state.vyos_session
 
@@ -365,8 +453,8 @@ def image_op(data: ImageModel):
 
     return success(res)
 
-@app.post('/generate', dependencies=[Depends(auth_required)])
-def generate_op(data: GenericModel):
+@app.post('/generate')
+def generate_op(data: GenerateModel):
     session = app.state.vyos_session
 
     op = data.op
@@ -385,8 +473,8 @@ def generate_op(data: GenericModel):
 
     return success(res)
 
-@app.post('/show', dependencies=[Depends(auth_required)])
-def show_op(data: GenericModel):
+@app.post('/show')
+def show_op(data: ShowModel):
     session = app.state.vyos_session
 
     op = data.op
