@@ -19,6 +19,7 @@
 import os
 import sys
 import grp
+import copy
 import json
 import logging
 import traceback
@@ -27,10 +28,10 @@ from typing import List, Union, Callable, Dict
 
 import uvicorn
 from fastapi import FastAPI, Depends, Request, Response, HTTPException
-from fastapi.responses import PlainTextResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 import vyos.config
 
@@ -76,6 +77,8 @@ def success(data):
     return HTMLResponse(resp)
 
 # Pydantic models for validation
+# validators added as needed for original design
+# schema_extra adds anotations to OpenAPI, to add examples
 
 class ApiModel(BaseModel):
     key: str
@@ -85,10 +88,32 @@ class BaseConfigureModel(BaseModel):
     path: List[str]
     value: str = None
 
+    @validator("path", pre=True, always=True)
+    def check_non_empty(cls, path):
+        assert len(path) > 0
+        return path
+
+    # Pydantic will cast where appropriate; for strict type check,
+    # add validator
+    @validator("path", pre=True, always=True)
+    def check_are_strings(cls, path):
+        assert all(isinstance(el, str) for el in path)
+        return path
+
 class ConfigureModel(ApiModel):
     op: str
     path: List[str]
     value: str = None
+
+    @validator("path", pre=True, always=True)
+    def check_non_empty(cls, path):
+        assert len(path) > 0
+        return path
+
+    @validator("path", pre=True, always=True)
+    def check_are_strings(cls, path):
+        assert all(isinstance(el, str) for el in path)
+        return path
 
     class Config:
         schema_extra = {
@@ -106,7 +131,7 @@ class ConfigureListModel(ApiModel):
         schema_extra = {
             "example": {
                 "key": "id_key",
-                "commands": "list",
+                "commands": "list of commands",
             }
         }
 
@@ -205,10 +230,22 @@ def auth_required(data: ApiModel):
         raise HTTPException(status_code=401, detail="Valid API key is required")
     app.state.vyos_id = id
 
-# override Request and APIRoute classes in order to convert form request to json
+# override Request and APIRoute classes in order to convert form request to json;
+# do all explicit validation here, for backwards compatability of error messages;
+# the explicit validation may be dropped, if desired, in favor of native
+# validation by FastAPI/Pydantic as is the case for application/json requests
 class MultipartRequest(Request):
     ERR_MISSING_KEY = False
     ERR_MISSING_DATA = False
+    ERR_NOT_JSON = False
+    ERR_NOT_DICT = False
+    ERR_NO_OP = False
+    ERR_NO_PATH = False
+    ERR_EMPTY_PATH = False
+    ERR_PATH_NOT_LIST = False
+    ERR_VALUE_NOT_STRING = False
+    ERR_PATH_NOT_LIST_OF_STR = False
+    offending_command = {}
     async def body(self) -> bytes:
         if not hasattr(self, "_body"):
             forms = {}
@@ -225,11 +262,50 @@ class MultipartRequest(Request):
                 if 'data' not in forms:
                     self.ERR_MISSING_DATA = True
                 else:
-                    tmp = json.loads(forms['data'])
+                    try:
+                        tmp = json.loads(forms['data'])
+                    except JSONDecodeError as e:
+                        print("JSE why am I here?")
+                        self.ERR_NOT_JSON = True
+                        self.exception = e
+                        tmp = {}
                     if isinstance(tmp, list):
                         merge['commands'] = tmp
                     else:
                         merge = tmp
+
+                if 'commands' in merge:
+                    cmds = merge['commands']
+                else:
+                    cmds = copy.deepcopy(merge)
+                    cmds = [cmds]
+
+                for c in cmds:
+                    print(f"JSE len(cmds) {len(cmds)}; c is {c}")
+                    if not isinstance(c, dict):
+                        print("JSE not dict")
+                        self.ERR_NOT_DICT = True
+                        self.offending_command = c
+                    elif 'op' not in c:
+                        print("JSE no op")
+                        self.ERR_NO_OP = True
+                        self.offending_command = c
+                    elif 'path' not in c:
+                        self.ERR_NO_PATH = True
+                        self.offending_command = c
+                    elif not c['path']:
+                        print("JSE set EMPTY_PATH")
+                        self.ERR_EMPTY_PATH = True
+                        self.offending_command = c
+                    elif not isinstance(c['path'], list):
+                        self.ERR_PATH_NOT_LIST = True
+                        self.offending_command = c
+                    elif not all(isinstance(el, str) for el in c['path']):
+                        self.ERR_PATH_NOT_LIST_OF_STR = True
+                        self.offending_command = c
+                    elif 'value' in c and not isinstance(c['value'], str):
+                        self.ERR_VALUE_NOT_STRING = True
+                        self.offending_command = c
 
                 if 'key' not in forms and 'key' not in merge:
                     self.ERR_MISSING_KEY = True
@@ -248,15 +324,42 @@ class MultipartRoute(APIRoute):
 
         async def custom_route_handler(request: Request) -> Response:
             request = MultipartRequest(request.scope, request.receive)
+            endpoint = request.url.path
             try:
                 response: Response = await original_route_handler(request)
             except HTTPException as e:
                 return error(e.status_code, e.detail)
             except Exception as e:
+                print("JSE yes exception")
                 if request.ERR_MISSING_KEY:
                     return error(422, "Valid API key is required")
                 if request.ERR_MISSING_DATA:
                     return error(422, "Non-empty data field is required")
+                if request.ERR_NOT_JSON:
+                    return error(400, "Failed to parse JSON: {0}".format(self.exception))
+                if endpoint == '/configure':
+                    print("JSE yes endpoint")
+                    if request.ERR_NOT_DICT:
+                        return error(400, "Malformed command \"{0}\": any command must be a dict".format(json.dumps(request.offending_command)))
+                    if request.ERR_NO_OP:
+                        return error(400, "Malformed command \"{0}\": missing \"op\" field".format(json.dumps(request.offending_command)))
+                    if request.ERR_NO_PATH:
+                        return error(400, "Malformed command \"{0}\": missing \"path\" field".format(json.dumps(request.offending_command)))
+                    if request.ERR_EMPTY_PATH:
+                        print("JSE yes EMPTY_PATH")
+                        return error(400, "Malformed command \"{0}\": empty path".format(json.dumps(request.offending_command)))
+                    if request.ERR_PATH_NOT_LIST:
+                        return error(400, "Malformed command \"{0}\": \"path\" field must be a list".format(json.dumps(request.offending_command)))
+                    if request.ERR_VALUE_NOT_STRING:
+                        return error(400, "Malformed command \"{0}\": \"value\" field must be a string".format(json.dumps(request.offending_command)))
+                    if request.ERR_PATH_NOT_LIST_OF_STR:
+                        return error(400, "Malformed command \"{0}\": \"path\" field must be a list of strings".format(json.dumps(request.offending_command)))
+                if endpoint in ('/retrieve','/generate','/show'):
+                    if request.ERR_NO_OP or request.ERR_NO_PATH:
+                        return error(400, "Missing required field. \"op\" and \"path\" fields are required")
+                if endpoint in ('/config-file', '/image'):
+                    if request.ERR_NO_OP:
+                        return error(400, "Missing required field \"op\"")
 
                 raise e
 
