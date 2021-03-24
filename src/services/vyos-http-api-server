@@ -31,7 +31,7 @@ from fastapi import FastAPI, Depends, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, StrictStr, validator
 
 import vyos.config
 
@@ -81,38 +81,26 @@ def success(data):
 # schema_extra adds anotations to OpenAPI, to add examples
 
 class ApiModel(BaseModel):
-    key: str
+    key: StrictStr
 
 class BaseConfigureModel(BaseModel):
-    op: str
-    path: List[str]
-    value: str = None
+    op: StrictStr
+    path: List[StrictStr]
+    value: StrictStr = None
 
     @validator("path", pre=True, always=True)
     def check_non_empty(cls, path):
         assert len(path) > 0
-        return path
-
-    # Pydantic will cast where appropriate; for strict type check,
-    # add validator
-    @validator("path", pre=True, always=True)
-    def check_are_strings(cls, path):
-        assert all(isinstance(el, str) for el in path)
         return path
 
 class ConfigureModel(ApiModel):
-    op: str
-    path: List[str]
-    value: str = None
+    op: StrictStr
+    path: List[StrictStr]
+    value: StrictStr = None
 
     @validator("path", pre=True, always=True)
     def check_non_empty(cls, path):
         assert len(path) > 0
-        return path
-
-    @validator("path", pre=True, always=True)
-    def check_are_strings(cls, path):
-        assert all(isinstance(el, str) for el in path)
         return path
 
     class Config:
@@ -136,9 +124,9 @@ class ConfigureListModel(ApiModel):
         }
 
 class RetrieveModel(ApiModel):
-    op: str
-    path: List[str]
-    configFormat: str = None
+    op: StrictStr
+    path: List[StrictStr]
+    configFormat: StrictStr = None
 
     class Config:
         schema_extra = {
@@ -152,8 +140,8 @@ class RetrieveModel(ApiModel):
         }
 
 class ConfigFileModel(ApiModel):
-    op: str
-    file: str = None
+    op: StrictStr
+    file: StrictStr = None
 
     class Config:
         schema_extra = {
@@ -165,9 +153,9 @@ class ConfigFileModel(ApiModel):
         }
 
 class ImageModel(ApiModel):
-    op: str
-    url: str = None
-    name: str = None
+    op: StrictStr
+    url: StrictStr = None
+    name: StrictStr = None
 
     class Config:
         schema_extra = {
@@ -180,8 +168,8 @@ class ImageModel(ApiModel):
         }
 
 class GenerateModel(ApiModel):
-    op: str
-    path: List[str]
+    op: StrictStr
+    path: List[StrictStr]
 
     class Config:
         schema_extra = {
@@ -193,8 +181,8 @@ class GenerateModel(ApiModel):
         }
 
 class ShowModel(ApiModel):
-    op: str
-    path: List[str]
+    op: StrictStr
+    path: List[StrictStr]
 
     class Config:
         schema_extra = {
@@ -265,7 +253,6 @@ class MultipartRequest(Request):
                     try:
                         tmp = json.loads(forms['data'])
                     except JSONDecodeError as e:
-                        print("JSE why am I here?")
                         self.ERR_NOT_JSON = True
                         self.exception = e
                         tmp = {}
@@ -281,20 +268,16 @@ class MultipartRequest(Request):
                     cmds = [cmds]
 
                 for c in cmds:
-                    print(f"JSE len(cmds) {len(cmds)}; c is {c}")
                     if not isinstance(c, dict):
-                        print("JSE not dict")
                         self.ERR_NOT_DICT = True
                         self.offending_command = c
                     elif 'op' not in c:
-                        print("JSE no op")
                         self.ERR_NO_OP = True
                         self.offending_command = c
                     elif 'path' not in c:
                         self.ERR_NO_PATH = True
                         self.offending_command = c
                     elif not c['path']:
-                        print("JSE set EMPTY_PATH")
                         self.ERR_EMPTY_PATH = True
                         self.offending_command = c
                     elif not isinstance(c['path'], list):
@@ -330,7 +313,6 @@ class MultipartRoute(APIRoute):
             except HTTPException as e:
                 return error(e.status_code, e.detail)
             except Exception as e:
-                print("JSE yes exception")
                 if request.ERR_MISSING_KEY:
                     return error(422, "Valid API key is required")
                 if request.ERR_MISSING_DATA:
@@ -338,7 +320,6 @@ class MultipartRoute(APIRoute):
                 if request.ERR_NOT_JSON:
                     return error(400, "Failed to parse JSON: {0}".format(self.exception))
                 if endpoint == '/configure':
-                    print("JSE yes endpoint")
                     if request.ERR_NOT_DICT:
                         return error(400, "Malformed command \"{0}\": any command must be a dict".format(json.dumps(request.offending_command)))
                     if request.ERR_NO_OP:
@@ -346,7 +327,6 @@ class MultipartRoute(APIRoute):
                     if request.ERR_NO_PATH:
                         return error(400, "Malformed command \"{0}\": missing \"path\" field".format(json.dumps(request.offending_command)))
                     if request.ERR_EMPTY_PATH:
-                        print("JSE yes EMPTY_PATH")
                         return error(400, "Malformed command \"{0}\": empty path".format(json.dumps(request.offending_command)))
                     if request.ERR_PATH_NOT_LIST:
                         return error(400, "Malformed command \"{0}\": \"path\" field must be a list".format(json.dumps(request.offending_command)))
