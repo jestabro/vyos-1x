@@ -77,7 +77,8 @@ def success(data):
     return HTMLResponse(resp)
 
 # Pydantic models for validation
-# validators added as needed for original design
+# Pydantic will cast when possible, so use StrictStr
+# validators added as needed for additional constraints
 # schema_extra adds anotations to OpenAPI, to add examples
 
 class ApiModel(BaseModel):
@@ -380,24 +381,17 @@ def configure_op(data: Union[ConfigureModel, ConfigureListModel]):
     error_msg = None
     try:
         for c in data:
+            op = c.op
+            path = c.path
 
             if c.value:
                 value = c.value
             else:
                 value = ""
 
-            op = c.op
-            path = c.path
-
-            if not value:
-                value = ""
-
             # For vyos.configsession calls that have no separate value arguments,
             # and for type checking too
-            try:
-                cfg_path = " ".join(path + [value]).strip()
-            except TypeError:
-                raise ConfigSessionError("Malformed command \"{0}\": \"path\" field must be a list of strings".format(json.dumps(c)))
+            cfg_path = " ".join(path + [value]).strip()
 
             if op == 'set':
                 # XXX: it would be nice to do a strict check for "path already exists",
