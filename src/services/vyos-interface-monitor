@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+import logging
+import signal
+import pyudev
+import time
+
+debug = True
+
+logger = logging.getLogger(__name__)
+logs_handler = logging.StreamHandler()
+logger.addHandler(logs_handler)
+
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+
+def eth_update(device):
+    logger.info(f"JSE eth action {device.action} device {device}")
+
+def wlan_update(device):
+    logger.info(f"JSE wlan action {device.action} device {device}")
+
+
+def main():
+    context = pyudev.Context()
+
+    for device in context.list_devices(subsystem='net'):
+        mac = None
+        intf = None
+        logger.info(f"JSE device: {device}")
+        if 'ID_NET_NAME_MAC' in device.properties:
+            mac = device.properties['ID_NET_NAME_MAC']
+        if 'INTERFACE' in device.properties:
+            intf = device.properties['INTERFACE']
+        logger.info(f"JSE device: mac {mac} interface {intf}")
+#        for p in device.properties:
+#            logger.info(f"JSE property {p} is {device.properties[p]}")
+
+    monitor = pyudev.Monitor.from_netlink(context)
+    monitor.filter_by('net')
+    def log_event(device):
+        logger.info(f"JSE in log_event, device is {device}")
+        if 'INTERFACE' in device.properties and 'eth' in device.properties['INTERFACE']:
+            eth_update(device)
+        else:
+            logger.info(f"JSE sanity: device.properties['INTERFACE'] {device.properties['INTERFACE']}")
+        if 'INTERFACE' in device.properties and 'wlan' in device.properties['INTERFACE']:
+            wlan_update(device)
+        else:
+            logger.info(f"JSE sanity: device.properties['INTERFACE'] {device.properties['INTERFACE']}")
+
+    def sig_handler(signum, frame):
+        observer.stop()
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, sig_handler)
+
+    observer = pyudev.MonitorObserver(monitor, callback=log_event)
+    observer.start()
+#    observer.run()
+
+    try:
+        while True:
+            pass
+#            logger.info(f"JSE eth_num is {eth_num}")
+#            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info(f"JSE exiting")
+
+if __name__=='__main__':
+    main()
