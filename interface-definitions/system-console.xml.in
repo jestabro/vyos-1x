@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/system-version.xml.i>
   <node name="system">
     <children>
       <node name="console" owner="${vyos_conf_scripts_dir}/system_console.py">

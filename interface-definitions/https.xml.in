@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!-- HTTPS configuration -->
 <interfaceDefinition>
-  <syntaxVersion component='https' version='2'></syntaxVersion>
+  #include <include/version/https-version.xml.i>
   <node name="service">
     <children>
       <node name="https" owner="${vyos_conf_scripts_dir}/https.py">
