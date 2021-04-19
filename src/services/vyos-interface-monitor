@@ -3,6 +3,7 @@
 import logging
 import signal
 import pyudev
+import netaddr
 import time
 
 debug = True
@@ -11,21 +12,46 @@ logger = logging.getLogger(__name__)
 logs_handler = logging.StreamHandler()
 logger.addHandler(logs_handler)
 
+config_file = '/opt/vyatta/etc/config/config.boot'
+
 if debug:
     logger.setLevel(logging.DEBUG)
 else:
     logger.setLevel(logging.INFO)
 
-def eth_update(device):
-    logger.info(f"JSE eth action {device.action} device {device}")
+class MacAddr:
+    mac_mapping = {}
+    def __init__(self, numerical):
+        self.mac = netaddr.EUI(numerical)
 
-def wlan_update(device):
-    logger.info(f"JSE wlan action {device.action} device {device}")
+    def is_multicast(self):
+        return bool(self.mac.words[0] & 0b01)
 
+    def is_locally_administered(self):
+        return bool(self.mac.words[0] & 0b10)
 
-def main():
-    context = pyudev.Context()
+    def is_on_passlist(self):
+        # not yet implemented; need to confirm wl from vyatta_interface_rescan
+        return False
 
+    @classmethod
+    def update(cls, mac, intf):
+        cls.mac_mapping[mac[-12:]] = intf
+
+def rationalize():
+    pass
+
+def update_boot():
+    from vyos.configtree import ConfigTree, ConfigTreeError
+
+    config_tree = ConfigTree(config_file)
+
+    print(f"JSE mac_mapping {MacAddr.mac_mapping}")
+
+    for mac, intf in MacAddr.mac_mapping.items():
+        config_tree.set(['interfaces', 'ethernet', intf, 'hw-id'], value=mac)
+
+def initialize(context):
     for device in context.list_devices(subsystem='net'):
         mac = None
         intf = None
@@ -35,8 +61,23 @@ def main():
         if 'INTERFACE' in device.properties:
             intf = device.properties['INTERFACE']
         logger.info(f"JSE device: mac {mac} interface {intf}")
-#        for p in device.properties:
-#            logger.info(f"JSE property {p} is {device.properties[p]}")
+        if mac:
+            MacAddr.update(mac, intf)
+
+    update_boot()
+
+def eth_update(device):
+    logger.info(f"JSE eth action {device.action} device {device}")
+    logger.info(f"JSE in eth_update, mac_mapping {MacAddr.mac_mapping}")
+
+def wlan_update(device):
+    logger.info(f"JSE wlan action {device.action} device {device}")
+
+
+def main():
+    context = pyudev.Context()
+
+    initialize(context)
 
     monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by('net')
@@ -59,15 +100,15 @@ def main():
 
     observer = pyudev.MonitorObserver(monitor, callback=log_event)
     observer.start()
-#    observer.run()
 
-    try:
-        while True:
+    while True:
+        try:
             pass
 #            logger.info(f"JSE eth_num is {eth_num}")
 #            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info(f"JSE exiting")
+        except KeyboardInterrupt:
+            logger.info(f"JSE exiting")
+            break
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()
