@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import logging
 import signal
 import pyudev
@@ -12,7 +13,11 @@ logger = logging.getLogger(__name__)
 logs_handler = logging.StreamHandler()
 logger.addHandler(logs_handler)
 
-config_file = '/opt/vyatta/etc/config/config.boot'
+config_path = '/opt/vyatta/etc/config/config.boot'
+config_status = '/tmp/vyos-config-status'
+
+tmp_interface_mapping = '/run/vyos-interface-mapping'
+interface_mapping = '/opt/vyatta/etc/config/vyos-interface-mapping'
 
 if debug:
     logger.setLevel(logging.DEBUG)
@@ -21,6 +26,7 @@ else:
 
 class MacAddr:
     mac_mapping = {}
+    netaddr.mac_eui48.word_sep=':'
     def __init__(self, numerical):
         self.mac = netaddr.EUI(numerical)
 
@@ -36,20 +42,62 @@ class MacAddr:
 
     @classmethod
     def update(cls, mac, intf):
-        cls.mac_mapping[mac[-12:]] = intf
+        if mac and intf:
+            cls.mac_mapping[mac] = intf
 
-def rationalize():
-    pass
+def boot_configuration_complete():
+    if os.path.isfile(config_status):
+        return True
+    return False
+
+def load_config(config_path):
+    session = ConfigSession()
+    session.load(config_path)
+    session.commit()
+
+def get_wireless_physical_device(intf):
+    if 'wlan' not in intf:
+        return None
+    tmp = os.readlink(f'/sys/class/net/{intf}/phy80211')
+    phy = os.path.basename(tmp)
+    print(f"JSE wireless phy is {phy}")
+    return phy
+
+def rationalize(stable: dict, proposed: dict):
+    check_keys = set(stable) & set(proposed)
+    for k in check_keys:
+        if stable[k] != proposed[k]:
+            pass
+
+    return
 
 def update_boot():
     from vyos.configtree import ConfigTree, ConfigTreeError
+
+    with open(config_path) as f:
+        config_file = f.read()
 
     config_tree = ConfigTree(config_file)
 
     print(f"JSE mac_mapping {MacAddr.mac_mapping}")
 
     for mac, intf in MacAddr.mac_mapping.items():
-        config_tree.set(['interfaces', 'ethernet', intf, 'hw-id'], value=mac)
+        if 'eth' in intf:
+            config_tree.set(['interfaces', 'ethernet', intf, 'hw-id'], value=mac)
+        if 'wlan' in intf:
+            phy = get_wireless_physical_device(intf)
+            if phy:
+                config_tree.set(['interfaces', 'wireless', intf, 'physical-device'], value=phy)
+
+    try:
+        with open(config_path, 'w') as f:
+            f.write(config_tree.to_string())
+        print("JSE wrote config")
+    except OSError as e:
+        print("JSE OSError {e}")
+
+def update_live():
+    pass
 
 def initialize(context):
     for device in context.list_devices(subsystem='net'):
@@ -62,9 +110,11 @@ def initialize(context):
             intf = device.properties['INTERFACE']
         logger.info(f"JSE device: mac {mac} interface {intf}")
         if mac:
+            mac = mac[-12:]
+            mac = ':'.join(mac[i:i+2] for i in range(0, 12, 2))                
             MacAddr.update(mac, intf)
 
-    update_boot()
+#    update_boot()
 
 def eth_update(device):
     logger.info(f"JSE eth action {device.action} device {device}")
@@ -81,7 +131,7 @@ def main():
 
     monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by('net')
-    def log_event(device):
+    def interface_event(device):
         logger.info(f"JSE in log_event, device is {device}")
         if 'INTERFACE' in device.properties and 'eth' in device.properties['INTERFACE']:
             eth_update(device)
@@ -98,17 +148,25 @@ def main():
 
     signal.signal(signal.SIGTERM, sig_handler)
 
-    observer = pyudev.MonitorObserver(monitor, callback=log_event)
+    observer = pyudev.MonitorObserver(monitor, callback=interface_event)
     observer.start()
 
-    while True:
-        try:
-            pass
+#    while True:
+#        if os.path.isfile(config_status):
+#            # mv file
+#            break
+#        time.sleep(2)
+
+    observer.join()
+
+#    while True:
+#        try:
+#            pass
 #            logger.info(f"JSE eth_num is {eth_num}")
 #            time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info(f"JSE exiting")
-            break
+#        except KeyboardInterrupt:
+#            logger.info(f"JSE exiting")
+#            break
 
 if __name__ == '__main__':
     main()
