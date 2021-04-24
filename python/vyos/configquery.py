@@ -18,8 +18,11 @@ A small library that allows querying existence or value(s) of config
 settings from op mode, and execution of arbitrary op mode commands.
 '''
 
+import os
 from subprocess import STDOUT
-from vyos.util import popen
+from vyos.util import popen, dict_search
+from vyos.configsession import ConfigSession, ConfigSessionError
+from vyos.config import Config
 
 
 class ConfigQueryError(Exception):
@@ -69,6 +72,47 @@ class CliShellApiConfigQuery(GenericConfigQuery):
         if err:
             raise ConfigQueryError('No values for given path')
         return out
+
+class ConfigDictQuery(GenericConfigQuery):
+    def __init__(self):
+        super().__init__()
+        self.session = ConfigSession(os.getpid())
+        env = self.session.get_session_env()
+        self.config = Config(session_env=env)
+
+    def get_config_dict(self, path=[], effective=False, key_mangling=None,
+                        get_first_key=False, no_multi_convert=False,
+                        no_tag_node_value_mangle=False):
+
+        config_dict = self.config.get_config_dict(path=path, effective=effective,
+                                                  key_mangling=key_mangling,
+                                                  get_first_key=get_first_key,
+                                                  no_multi_convert=no_multi_convert,
+                                                  no_tag_node_value_mangle=no_tag_node_value_mangle)
+
+        return config_dict
+
+    def exists(self, path: list):
+        config_dict = self.get_config_dict()
+        dpath = '.'.join(path)
+        res = dict_search(dpath, config_dict)
+        if res:
+            return True
+        return False
+
+    # currently there is no distinction between the following two functions,
+    # nor can there be, pending the resolution of T3234.
+    def value(self, path: list):
+        config_dict = self.get_config_dict()
+        dpath = '.'.join(path)
+        res = dict_search(dpath, config_dict)
+        return res
+
+    def values(self, path: list):
+        config_dict = self.get_config_dict()
+        dpath = '.'.join(path)
+        res = dict_search(dpath, config_dict)
+        return res
 
 class VbashOpRun(GenericOpRun):
     def __init__(self):
