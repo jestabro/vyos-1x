@@ -50,12 +50,23 @@ def boot_configuration_complete():
         return True
     return False
 
-def load_config(config_path):
-    session = ConfigSession()
+def read_interface_config() -> dict:
+    with open(config_path) as f:
+        config_file = f.read()
+    config = ConfigTree(config_file)
+
+def read_interface_mapping() -> dict:
+    pass
+
+def write_interface_mapping() -> None:
+    pass
+
+def load_config(config_path: str):
+    session = ConfigSession(os.getpid())
     session.load(config_path)
     session.commit()
 
-def get_wireless_physical_device(intf):
+def get_wireless_physical_device(intf: str) -> str:
     if 'wlan' not in intf:
         return None
     tmp = os.readlink(f'/sys/class/net/{intf}/phy80211')
@@ -63,7 +74,7 @@ def get_wireless_physical_device(intf):
     print(f"JSE wireless phy is {phy}")
     return phy
 
-def rationalize(stable: dict, proposed: dict):
+def rationalize(keys: set, stable: dict, proposed: dict):
     check_keys = set(stable) & set(proposed)
     for k in check_keys:
         if stable[k] != proposed[k]:
@@ -157,7 +168,12 @@ def main():
 #            break
 #        time.sleep(2)
 
-    observer.join()
+#    observer.join()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info(f"JSE exiting")
 
 #    while True:
 #        try:
