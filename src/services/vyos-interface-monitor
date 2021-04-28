@@ -63,8 +63,7 @@ class MacAddr:
             dict_map['wlan'][mac] = intf
 
     @classmethod
-    def find_and_remove_interface(cls, addr) -> Tuple[str,str]:
-        intf = ''
+    def find_and_remove_interface(cls, addr, write_config=False) -> Tuple[str,str]:
         intf_type = ''
         if addr in cls.interface_mapping['eth']:
             intf_type = 'ethernet'
@@ -73,10 +72,22 @@ class MacAddr:
             intf_type = 'wireless'
             intf = cls.interface_mapping['wlan'].pop(addr)
 
+        if write_config and intf and intf_type:
+            with open(config_path) as f:
+                config_file = f.read()
+            config = ConfigTree(config_file)
+
+            config.delete(['interfaces', intf_type, intf])
+
+            with open(config_path, 'w') as f:
+                f.write(config.to_string())
+
+            load_config(config_path)
+
         return (intf, intf_type)
 
     @classmethod
-    def add_interface(cls, addr, intf) -> Tuple[str, str]:
+    def add_interface(cls, addr, intf, write_config=False) -> Tuple[str, str]:
         intf_type = ''
         if 'eth' in intf:
             intf_type = 'ethernet'
@@ -86,6 +97,23 @@ class MacAddr:
             intf_type = 'wireless'
             # TODO: check for first available here
             cls.interface_mapping['wlan'][addr] = intf
+
+        logger.info(f"JSE intf {intf} intf_type {intf_type}")
+
+        if write_config and intf and intf_type:
+            with open(config_path) as f:
+                config_file = f.read()
+            config = ConfigTree(config_file)
+
+            config.set(['interfaces', intf_type, intf, 'hw-id'], value=addr)
+            if intf_type == 'wireless':
+                config.set(['interfaces', intf_type, intf, 'physical-device'],
+                           value=get_wireless_physical_device(intf))
+
+            with open(config_path, 'w') as f:
+                f.write(config.to_string())
+
+            load_config(config_path)
 
         return (addr, intf, intf_type)
 
@@ -143,6 +171,7 @@ def load_transient_mapping(context) -> None:
 def load_config(config_path: str) -> None:
     if not boot_configuration_complete():
         return
+    logger.info("loading updated config")
     session = ConfigSession(os.getpid())
     session.load_config(config_path)
     session.commit()
@@ -163,10 +192,12 @@ def interface_rename(old: str, new: str):
 def rationalize(keys: set, stable: dict, proposed: dict):
     rename = []
     for k in keys:
-        if k in stable['eth'] and stable['eth'][k] != proposed['eth'][k]:
+        if k in stable and stable[k] != proposed[k]:
             rename.append(k)
-        if k in stable['wlan'] and stable['wlan'][k] != proposed['wlan'][k]:
-            rename.append(k)
+#        if k in stable['wlan'] and stable['wlan'][k] != proposed['wlan'][k]:
+#            rename.append(k)
+
+    logger.debug(f"JSE rename list {rename}")
 
     return
 
@@ -300,9 +331,9 @@ def main():
         mac = MacAddr(addr)
 
         if action == 'add':
-            add_interfaces(set(mac.mac))
+            mac.add_interface(str(mac.mac), intf, write_config=True)
         if action == 'remove':
-            remove_interfaces(set(mac.mac))
+            mac.find_and_remove_interface(str(mac.mac), write_config=True)
 
     def sig_handler(signum, frame):
         observer.stop()
