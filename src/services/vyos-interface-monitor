@@ -5,7 +5,13 @@ import logging
 import signal
 import pyudev
 import netaddr
+import json
 import time
+
+from typing import Tuple
+
+from vyos.configtree import ConfigTree
+from vyos.configsession import ConfigSession
 
 debug = True
 
@@ -16,8 +22,7 @@ logger.addHandler(logs_handler)
 config_path = '/opt/vyatta/etc/config/config.boot'
 config_status = '/tmp/vyos-config-status'
 
-tmp_interface_mapping = '/run/vyos-interface-mapping'
-interface_mapping = '/opt/vyatta/etc/config/vyos-interface-mapping'
+interface_mapping = '/opt/vyatta/etc/config/interface.mapping'
 
 if debug:
     logger.setLevel(logging.DEBUG)
@@ -25,7 +30,8 @@ else:
     logger.setLevel(logging.INFO)
 
 class MacAddr:
-    mac_mapping = {}
+    interface_mapping = {'eth': {}, 'wlan': {}}
+    transient_mapping = {'eth': {}, 'wlan': {}}
     netaddr.mac_eui48.word_sep=':'
     def __init__(self, numerical):
         self.mac = netaddr.EUI(numerical)
@@ -41,9 +47,30 @@ class MacAddr:
         return False
 
     @classmethod
-    def update(cls, mac, intf):
-        if mac and intf:
-            cls.mac_mapping[mac] = intf
+    def update(cls, mapping, mac, intf):
+        if not mac or not intf:
+            return
+
+        if 'interface' in mapping:
+            dict_map = cls.interface_mapping
+        if 'transient' in mapping:
+            dict_map = cls.transient_mapping
+
+        if 'eth' in intf:
+            dict_map['eth'][mac] = intf
+        if 'wlan' in intf:
+            dict_map['wlan'][mac] = intf
+
+    @classmethod
+    def find_and_remove_interface(cls, addr) -> Tuple[str,str]:
+        if addr in cls.interface_mapping['eth']:
+            intf_type = 'ethernet'
+            intf = cls.interface_mapping['eth'].pop(addr)
+        if addr in cls.interface_mapping['wlan']:
+            intf_type = 'wireless'
+            intf = cls.interface_mapping['wlan'].pop(addr)
+
+        return (intf, intf_type)
 
 def boot_configuration_complete():
     if os.path.isfile(config_status):
@@ -56,14 +83,48 @@ def read_interface_config() -> dict:
     config = ConfigTree(config_file)
 
 def read_interface_mapping() -> dict:
-    pass
+    try:
+        with open(interface_mapping) as f:
+            MacAddr.interface_mapping = json.load(f)
+    except OSError:
+        return False
+    else:
+        return True
 
-def write_interface_mapping() -> None:
-    pass
+def write_interface_mapping() -> bool:
+    try:
+        with open(interface_mapping, 'w') as f:
+            json.dump(MacAddr.interface_mapping, f)
+    except OSError:
+        return False
+    else:
+        return True
 
-def load_config(config_path: str):
+def load_interface_mapping() -> bool:
+    if read_interface_mapping():
+        return True
+    if read_interface_config():
+        return True
+    return False
+
+def load_transient_mapping(context) -> None:
+    for device in context.list_devices(subsystem='net'):
+        mac = None
+        intf = None
+        if 'ID_NET_NAME_MAC' in device.properties:
+            mac = device.properties['ID_NET_NAME_MAC']
+        if 'INTERFACE' in device.properties:
+            intf = device.properties['INTERFACE']
+        logger.info(f"JSE device: mac {mac} interface {intf}")
+        if mac and intf:
+            mac = mac[-12:]
+            MacAddr.update('transient', mac, intf)
+
+def load_config(config_path: str) -> None:
+    if not boot_configuration_complete():
+        return
     session = ConfigSession(os.getpid())
-    session.load(config_path)
+    session.load_config(config_path)
     session.commit()
 
 def get_wireless_physical_device(intf: str) -> str:
@@ -74,13 +135,40 @@ def get_wireless_physical_device(intf: str) -> str:
     print(f"JSE wireless phy is {phy}")
     return phy
 
+def interface_rename(old: str, new: str):
+    cmd(f'sudo ip link set {old} down')
+    cmd(f'sudo ip link set {old} name {new}')
+    cmd(f'sudo ip link set {new} up')
+
 def rationalize(keys: set, stable: dict, proposed: dict):
-    check_keys = set(stable) & set(proposed)
-    for k in check_keys:
+    rename = []
+    for k in keys:
         if stable[k] != proposed[k]:
-            pass
+            rename.append(k)
 
     return
+
+def remove_interfaces(addrs: set):
+    removed_interfaces = []
+    for k in addrs:
+        removed_interfaces.append(MacAddr.find_and_remove_interface(k))
+
+    write_interface_mapping()
+
+    with open(config_path) as f:
+        config_file = f.read()
+    config = ConfigTree(config_file)
+
+    for (intf, intf_type) in removed_interfaces:
+        config.delete(['interfaces', intf_type, intf])
+
+    with open(config_path, 'w') as f:
+        f.write(config.to_string())
+
+    load_config(config_path)
+
+def add_interfaces(addrs: set):
+    pass
 
 def update_boot():
     from vyos.configtree import ConfigTree, ConfigTreeError
@@ -90,9 +178,9 @@ def update_boot():
 
     config_tree = ConfigTree(config_file)
 
-    print(f"JSE mac_mapping {MacAddr.mac_mapping}")
+    print(f"JSE interface_mapping {MacAddr.interface_mapping}")
 
-    for mac, intf in MacAddr.mac_mapping.items():
+    for mac, intf in MacAddr.interface_mapping.items():
         if 'eth' in intf:
             config_tree.set(['interfaces', 'ethernet', intf, 'hw-id'], value=mac)
         if 'wlan' in intf:
@@ -111,25 +199,28 @@ def update_live():
     pass
 
 def initialize(context):
-    for device in context.list_devices(subsystem='net'):
-        mac = None
-        intf = None
-        logger.info(f"JSE device: {device}")
-        if 'ID_NET_NAME_MAC' in device.properties:
-            mac = device.properties['ID_NET_NAME_MAC']
-        if 'INTERFACE' in device.properties:
-            intf = device.properties['INTERFACE']
-        logger.info(f"JSE device: mac {mac} interface {intf}")
-        if mac:
-            mac = mac[-12:]
-            mac = ':'.join(mac[i:i+2] for i in range(0, 12, 2))                
-            MacAddr.update(mac, intf)
+    load_interface_mapping()
+    load_transient_mapping(context)
+
+    intf_set = set(MacAddr.interface_mapping)
+    tran_set = set(MacAddr.transient_mapping)
+
+    intersection = intf_set & tran_set
+    to_remove = intf_set - intersection
+    to_add = tran_set - intersection
+
+    remove_interfaces(to_remove)
+    rationalize(intersection, MacAddr.interface_mapping,
+                              MacAddr.transient_mapping)
+    add_interfaces(to_add)
+
+    
 
 #    update_boot()
 
 def eth_update(device):
     logger.info(f"JSE eth action {device.action} device {device}")
-    logger.info(f"JSE in eth_update, mac_mapping {MacAddr.mac_mapping}")
+    logger.info(f"JSE in eth_update, interface_mapping {MacAddr.interface_mapping}")
 
 def wlan_update(device):
     logger.info(f"JSE wlan action {device.action} device {device}")
