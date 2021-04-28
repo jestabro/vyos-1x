@@ -12,6 +12,7 @@ from typing import Tuple
 
 from vyos.configtree import ConfigTree
 from vyos.configsession import ConfigSession
+from vyos.util import cmd
 
 debug = True
 
@@ -22,7 +23,7 @@ logger.addHandler(logs_handler)
 config_path = '/opt/vyatta/etc/config/config.boot'
 config_status = '/tmp/vyos-config-status'
 
-interface_mapping = '/opt/vyatta/etc/config/interface.mapping'
+interface_map = '/opt/vyatta/etc/config/interface.map'
 
 if debug:
     logger.setLevel(logging.DEBUG)
@@ -63,6 +64,8 @@ class MacAddr:
 
     @classmethod
     def find_and_remove_interface(cls, addr) -> Tuple[str,str]:
+        intf = ''
+        intf_type = ''
         if addr in cls.interface_mapping['eth']:
             intf_type = 'ethernet'
             intf = cls.interface_mapping['eth'].pop(addr)
@@ -71,6 +74,20 @@ class MacAddr:
             intf = cls.interface_mapping['wlan'].pop(addr)
 
         return (intf, intf_type)
+
+    @classmethod
+    def add_interface(cls, addr, intf) -> Tuple[str, str]:
+        intf_type = ''
+        if 'eth' in intf:
+            intf_type = 'ethernet'
+            # TODO: consult biosdevname here
+            cls.interface_mapping['eth'][addr] = intf
+        if 'wlan' in intf:
+            intf_type = 'wireless'
+            # TODO: check for first available here
+            cls.interface_mapping['wlan'][addr] = intf
+
+        return (addr, intf, intf_type)
 
 def boot_configuration_complete():
     if os.path.isfile(config_status):
@@ -81,10 +98,12 @@ def read_interface_config() -> dict:
     with open(config_path) as f:
         config_file = f.read()
     config = ConfigTree(config_file)
+    nodes = config.list_nodes(['interfaces'])
+    logger.info(f"JSE nodes: {nodes}")
 
 def read_interface_mapping() -> dict:
     try:
-        with open(interface_mapping) as f:
+        with open(interface_map) as f:
             MacAddr.interface_mapping = json.load(f)
     except OSError:
         return False
@@ -93,7 +112,7 @@ def read_interface_mapping() -> dict:
 
 def write_interface_mapping() -> bool:
     try:
-        with open(interface_mapping, 'w') as f:
+        with open(interface_map, 'w') as f:
             json.dump(MacAddr.interface_mapping, f)
     except OSError:
         return False
@@ -109,16 +128,17 @@ def load_interface_mapping() -> bool:
 
 def load_transient_mapping(context) -> None:
     for device in context.list_devices(subsystem='net'):
-        mac = None
+        addr = None
         intf = None
         if 'ID_NET_NAME_MAC' in device.properties:
-            mac = device.properties['ID_NET_NAME_MAC']
+            addr = device.properties['ID_NET_NAME_MAC']
         if 'INTERFACE' in device.properties:
             intf = device.properties['INTERFACE']
-        logger.info(f"JSE device: mac {mac} interface {intf}")
-        if mac and intf:
-            mac = mac[-12:]
-            MacAddr.update('transient', mac, intf)
+        logger.info(f"JSE device: mac {addr} interface {intf}")
+        if addr and intf:
+            addr = addr[-12:]
+            mac = MacAddr(addr)
+            mac.update('transient', str(mac.mac), intf)
 
 def load_config(config_path: str) -> None:
     if not boot_configuration_complete():
@@ -143,7 +163,9 @@ def interface_rename(old: str, new: str):
 def rationalize(keys: set, stable: dict, proposed: dict):
     rename = []
     for k in keys:
-        if stable[k] != proposed[k]:
+        if k in stable['eth'] and stable['eth'][k] != proposed['eth'][k]:
+            rename.append(k)
+        if k in stable['wlan'] and stable['wlan'][k] != proposed['wlan'][k]:
             rename.append(k)
 
     return
@@ -167,11 +189,43 @@ def remove_interfaces(addrs: set):
 
     load_config(config_path)
 
-def add_interfaces(addrs: set):
-    pass
+def add_interfaces(addr: set):
+    eths = MacAddr.transient_mapping['eth']
+    wlans = MacAddr.transient_mapping['wlan']
+    added_interfaces = []
+    for k in addr:
+        mac = MacAddr(k)
+        if str(mac.mac) in eths:
+            # biosdevname(eths[k])
+            added_interfaces.append(MacAddr.add_interface(str(mac.mac),
+                eths[str(mac.mac)]))
+        if str(mac.mac) in wlans:
+            added_interfaces.append(MacAddr.add_interface(str(mac.mac),
+                wlans[str(mac.mac)]))
+
+    logger.info(f"JSE added_interfaces {added_interfaces}")
+
+    write_interface_mapping()
+
+    with open(config_path) as f:
+        config_file = f.read()
+    config = ConfigTree(config_file)
+
+    for (addr, intf, intf_type) in added_interfaces:
+        if not intf or not intf_type:
+            continue
+        config.set(['interfaces', intf_type, intf, 'hw-id'], value=addr)
+        if intf_type == 'wireless':
+            config.set(['interfaces', intf_type, intf, 'physical-device'],
+                       value=get_wireless_physical_device(intf))
+
+    with open(config_path, 'w') as f:
+        f.write(config.to_string())
+
+    load_config(config_path)
 
 def update_boot():
-    from vyos.configtree import ConfigTree, ConfigTreeError
+#    from vyos.configtree import ConfigTree, ConfigTreeError
 
     with open(config_path) as f:
         config_file = f.read()
@@ -199,32 +253,28 @@ def update_live():
     pass
 
 def initialize(context):
-    load_interface_mapping()
+    if not load_interface_mapping():
+        logger.critical("JSE load_interface_mapping() failed")
     load_transient_mapping(context)
 
-    intf_set = set(MacAddr.interface_mapping)
-    tran_set = set(MacAddr.transient_mapping)
+    for name in ('eth', 'wlan'):
+        intf_set = set(MacAddr.interface_mapping[name])
+        tran_set = set(MacAddr.transient_mapping[name])
 
-    intersection = intf_set & tran_set
-    to_remove = intf_set - intersection
-    to_add = tran_set - intersection
+        intersection = intf_set & tran_set
+        to_remove = intf_set - intersection
+        to_add = tran_set - intersection
 
-    remove_interfaces(to_remove)
-    rationalize(intersection, MacAddr.interface_mapping,
-                              MacAddr.transient_mapping)
-    add_interfaces(to_add)
+        if to_remove:
+            remove_interfaces(to_remove)
 
-    
-
-#    update_boot()
-
-def eth_update(device):
-    logger.info(f"JSE eth action {device.action} device {device}")
-    logger.info(f"JSE in eth_update, interface_mapping {MacAddr.interface_mapping}")
-
-def wlan_update(device):
-    logger.info(f"JSE wlan action {device.action} device {device}")
-
+        rationalize(intersection, MacAddr.interface_mapping[name],
+                                  MacAddr.transient_mapping[name])
+        if to_add:
+            logger.info(f"JSE to_add: {to_add}")
+            add_interfaces(to_add)
+        else:
+            logger.info("JSE nothing to add")
 
 def main():
     context = pyudev.Context()
@@ -234,15 +284,25 @@ def main():
     monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by('net')
     def interface_event(device):
-        logger.info(f"JSE in log_event, device is {device}")
-        if 'INTERFACE' in device.properties and 'eth' in device.properties['INTERFACE']:
-            eth_update(device)
-        else:
-            logger.info(f"JSE sanity: device.properties['INTERFACE'] {device.properties['INTERFACE']}")
-        if 'INTERFACE' in device.properties and 'wlan' in device.properties['INTERFACE']:
-            wlan_update(device)
-        else:
-            logger.info(f"JSE sanity: device.properties['INTERFACE'] {device.properties['INTERFACE']}")
+        logger.info(f"JSE in log_event, device is {device} action is {device.action}")
+        mac = None
+        intf = None
+        if 'ID_NET_NAME_MAC' in device.properties:
+            addr = device.properties['ID_NET_NAME_MAC']
+            addr = addr[-12:]
+        if 'INTERFACE' in device.properties:
+            intf = device.properties['INTERFACE']
+        action = device.action
+
+        if not addr or not intf:
+            return
+
+        mac = MacAddr(addr)
+
+        if action == 'add':
+            add_interfaces(set(mac.mac))
+        if action == 'remove':
+            remove_interfaces(set(mac.mac))
 
     def sig_handler(signum, frame):
         observer.stop()
@@ -253,27 +313,11 @@ def main():
     observer = pyudev.MonitorObserver(monitor, callback=interface_event)
     observer.start()
 
-#    while True:
-#        if os.path.isfile(config_status):
-#            # mv file
-#            break
-#        time.sleep(2)
-
-#    observer.join()
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         logger.info(f"JSE exiting")
-
-#    while True:
-#        try:
-#            pass
-#            logger.info(f"JSE eth_num is {eth_num}")
-#            time.sleep(1)
-#        except KeyboardInterrupt:
-#            logger.info(f"JSE exiting")
-#            break
 
 if __name__ == '__main__':
     main()
