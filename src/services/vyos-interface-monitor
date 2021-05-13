@@ -1,0 +1,391 @@
+#!/usr/bin/env python3
+#
+# Copyright (C) 2021 VyOS maintainers and contributors
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or later as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+
+import os
+import grp
+import logging
+import signal
+import pyudev
+import netaddr
+import json
+import time
+
+from typing import Tuple
+from contextlib import contextmanager
+
+from vyos.configtree import ConfigTree
+from vyos.configsession import ConfigSession
+from vyos.util import cmd
+
+debug = True
+
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(levelname)s: %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+CFG_GROUP = 'vyattacfg'
+FIXED = 'fixed'
+FOUND = 'found'
+
+config_path = '/opt/vyatta/etc/config/config.boot'
+config_status = '/tmp/vyos-config-status'
+
+interface_map = '/opt/vyatta/etc/config/interface.map'
+
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+
+@contextmanager
+def configtree(path):
+    try:
+        with open(path) as f:
+            config_file = f.read()
+        config = ConfigTree(config_file)
+        yield config
+    except Exception as e:
+        logger.critical(f"Exception {e}")
+    finally:
+        try:
+            with open(path, 'w') as f:
+                f.write(config.to_string())
+        except OSError as e:
+            logger.critical(f"OSError {e}")
+
+class MacAddr:
+    interface_mapping = {FIXED: {'eth': {}, 'wlan': {}},
+                         FOUND: {'eth': {}, 'wlan': {}}}
+
+    netaddr.mac_eui48.word_sep = ':'
+
+    def __init__(self, bare):
+        self.addr = netaddr.EUI(bare)
+
+    def _is_multicast(self):
+        return bool(self.addr.words[0] & 0b01)
+
+    def _is_locally_administered(self):
+        return bool(self.addr.words[0] & 0b10)
+
+    def _is_on_passlist(self):
+        # not yet implemented; need to confirm wl from vyatta_interface_rescan
+        return False
+
+    def is_persistent(self):
+        pass
+
+    @classmethod
+    def add_fixed_interface(cls, addr, intf, write_config=False) -> Tuple[str, str, str]:
+        mapping = cls.interface_mapping[FIXED]
+
+        if 'eth' in intf:
+            intf_type = 'ethernet'
+            mapping['eth'][addr] = intf
+        elif 'wlan' in intf:
+            intf_type = 'wireless'
+            mapping['wlan'][addr] = intf
+        else:
+            return (None, None, None)
+
+        res = (addr, intf, intf_type)
+
+        if not (write_config and intf and intf_type):
+            return res
+
+        with configtree(config_path) as config:
+            config.set(['interfaces', intf_type, intf, 'hw-id'], value=addr)
+            config.set_tag(['interfaces', intf_type])
+
+            if intf_type == 'wireless':
+                config.set(['interfaces', intf_type, intf, 'physical-device'],
+                           value=get_wireless_physical_device(intf))
+
+        load_config(config_path)
+
+        return res
+
+    @classmethod
+    def remove_fixed_interface(cls, addr, write_config=False) -> Tuple[str, str]:
+        mapping = cls.interface_mapping[FIXED]
+
+        if addr in mapping['eth']:
+            intf_type = 'ethernet'
+            intf = mapping['eth'].pop(addr)
+        elif addr in mapping['wlan']:
+            intf_type = 'wireless'
+            intf = mapping['wlan'].pop(addr)
+        else:
+            return (None, None)
+
+        res = (intf, intf_type)
+
+        if not (write_config and intf and intf_type):
+            return res
+
+        with configtree(config_path) as config:
+            config.delete(['interfaces', intf_type, intf])
+
+        load_config(config_path)
+
+        return res
+
+    @classmethod
+    def update(cls, which, addr, intf) -> None:
+        if not addr or not intf:
+            return
+
+        mapping = cls.interface_mapping[which]
+
+        if 'eth' in intf:
+            mapping['eth'][addr] = intf
+        if 'wlan' in intf:
+            mapping['wlan'][addr] = intf
+
+def boot_configuration_complete() -> bool:
+    if os.path.isfile(config_status):
+        return True
+    return False
+
+def get_wireless_physical_device(intf: str) -> str:
+    if 'wlan' not in intf:
+        return None
+    tmp = os.readlink(f'/sys/class/net/{intf}/phy80211')
+    phy = os.path.basename(tmp)
+    logger.debug(f"wireless phy is {phy}")
+    return phy
+
+def read_interface_config() -> bool:
+    with open(config_path) as f:
+        config_file = f.read()
+    config = ConfigTree(config_file)
+
+    for intf_type in ('ethernet', 'wireless'):
+        base = ['interfaces', intf_type]
+        if not config.exists(base):
+            continue
+        nodes = config.list_nodes(base)
+        for intf in nodes:
+            hwid = config.return_value(base + [intf] + ['hw-id'])
+            if not hwid:
+                return False
+            MacAddr.update(FIXED, hwid, intf)
+
+    return True
+
+def read_fixed_mapping() -> bool:
+    try:
+        with open(interface_map) as f:
+            MacAddr.interface_mapping[FIXED] = json.load(f)
+    except OSError:
+        return False
+
+    return True
+
+def write_fixed_mapping() -> bool:
+    try:
+        with open(interface_map, 'w') as f:
+            json.dump(MacAddr.interface_mapping[FIXED], f)
+    except OSError:
+        return False
+    else:
+        return True
+
+def load_fixed_mapping() -> bool:
+    if read_fixed_mapping():
+        return True
+    if read_interface_config():
+        return True
+    return False
+
+def load_found_mapping(context) -> bool:
+    for device in context.list_devices(subsystem='net'):
+        addr = None
+        intf = None
+        addr = device.properties.get('ID_NET_NAME_MAC', '')
+        addr = addr[-12:]
+        intf = device.properties.get('INTERFACE', '')
+
+        if not addr or not intf:
+            continue
+
+        mac = MacAddr(addr)
+        mac.update(FOUND, str(mac.addr), intf)
+
+    return True
+
+def load_config(config_path: str) -> None:
+    if not boot_configuration_complete():
+        return
+    logger.info("loading updated config")
+    session = ConfigSession(os.getpid())
+    session.load_config(config_path)
+    session.commit()
+
+def add_interfaces(addrs: dict) -> None:
+    if not addrs:
+        return
+
+    added_interfaces = []
+    for addr, intf in addrs.items():
+        added_interfaces.append(MacAddr.add_fixed_interface(addr, intf))
+
+    sorted(added_interfaces, key=lambda k: k[1])
+
+    if not write_fixed_mapping():
+        logger.critical("write_fixed_mapping of interfaces failed")
+
+    with configtree(config_path) as config:
+        for iftuple in added_interfaces:
+            addr = iftuple[0]
+            intf = iftuple[1]
+            intf_type = iftuple[2]
+            if not intf or not intf_type:
+                continue
+
+            config.set(['interfaces', intf_type, intf, 'hw-id'], value=addr)
+            config.set_tag(['interfaces', intf_type])
+            if intf_type == 'wireless':
+                config.set(['interfaces', intf_type, intf, 'physical-device'],
+                           value=get_wireless_physical_device(intf))
+
+    load_config(config_path)
+
+def remove_interfaces(addrs: set) -> None:
+    if not addrs:
+        return
+
+    removed_interfaces = []
+    for addr in addrs:
+        removed_interfaces.append(MacAddr.remove_fixed_interface(addr))
+
+    if not write_fixed_mapping():
+        logger.critical("write_fixed_mapping of interfaces failed")
+
+    with configtree(config_path) as config:
+        for iftuple in removed_interfaces:
+            intf, intf_type = iftuple
+            config.delete(['interfaces', intf_type, intf])
+
+    load_config(config_path)
+
+def interface_rename(old: str, new: str) -> None:
+    cmd(f'sudo ip link set {old} down')
+    cmd(f'sudo ip link set {old} name {new}')
+    cmd(f'sudo ip link set {new} up')
+
+def temporary_name(intf: str) -> str:
+    intf = f'tmp{intf}'
+
+def rationalize_and_add(addrs: set, fixed: dict, found: dict) -> None:
+    if not addrs or boot_configuration_complete:
+        return
+
+    rename = addrs.copy()
+    for a in rename:
+        if fixed[a] == found[a]:
+            rename.remove(a)
+            continue
+        interface_rename(found[a], temporary_name(found[a]))
+    for a in rename:
+        interface_rename(temporary_name(found[a]), fixed[a])
+
+    addr_dict = {a: fixed[a] for a in addrs}
+
+    add_interfaces(addr_dict)
+
+def initialize(context):
+    if not load_fixed_mapping():
+        logger.debug("no load_fixed_mapping(); expected during installation")
+    if not load_found_mapping(context):
+        logger.info("load_found_mapping() failed")
+
+    logger.debug(f"fixed_mapping {MacAddr.interface_mapping['fixed']['eth']}")
+    logger.debug(f"found_mapping {MacAddr.interface_mapping['found']['eth']}")
+
+    for name in ('eth', 'wlan'):
+        fixed_mapping = MacAddr.interface_mapping[FIXED][name]
+        found_mapping = MacAddr.interface_mapping[FOUND][name]
+
+        fixed_set = set(fixed_mapping)
+        found_set = set(found_mapping)
+
+        intersection = fixed_set & found_set
+        remove_set = fixed_set - intersection
+        new_set = found_set - intersection
+
+        new_dict = {k: found_mapping[k] for k in new_set}
+
+        remove_interfaces(remove_set)
+
+        rationalize_and_add(intersection, fixed_mapping, found_mapping)
+
+        add_interfaces(new_dict)
+
+def main():
+    cfg_group = grp.getgrnam(CFG_GROUP)
+    os.setgid(cfg_group.gr_gid)
+
+    # preserve vyattacfg group write access to running config
+    os.umask(0o002)
+
+    context = pyudev.Context()
+
+    initialize(context)
+
+    monitor = pyudev.Monitor.from_netlink(context)
+    monitor.filter_by('net')
+
+    def interface_event(device):
+        logger.info(f"udev event, device is {device}; action is {device.action}")
+        addr = None
+        intf = None
+        addr = device.properties.get('ID_NET_NAME_MAC', '')
+        addr = addr[-12:]
+        intf = device.properties.get('INTERFACE', '')
+        action = device.action
+
+        if not addr or not intf:
+            return
+
+        mac = MacAddr(addr)
+
+        if action == 'add':
+            mac.add_fixed_interface(str(mac.addr), intf, write_config=True)
+        if action == 'remove':
+            mac.remove_fixed_interface(str(mac.addr), write_config=True)
+
+    def sig_handler(signum, frame):
+        observer.stop()
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, sig_handler)
+
+    observer = pyudev.MonitorObserver(monitor, callback=interface_event)
+    observer.start()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info(f"exiting")
+
+if __name__ == '__main__':
+    main()
