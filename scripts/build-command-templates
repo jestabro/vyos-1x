@@ -160,11 +160,11 @@ def get_properties(p):
     vcge = p.findall("constraintGroup")
 
     group_validator_string = ""
-    if vcge is not None:
+    if len(vcge):
         for vcg in vcge:
             group_validator_string = group_validator_string + " --grp " + collect_validators(vcg)
 
-    if vce or vcge:
+    if vce is not None or len(vcge):
         validator_script = '${vyos_libexec_dir}/validate-value'
         validator_string = "exec \"{0} {1} {2} --value \\\'$VAR(@)\\\'\"; \"{3}\"".format(validator_script, distinct_validator_string, group_validator_string, error_msg)
 
