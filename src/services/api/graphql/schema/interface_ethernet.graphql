@@ -1,0 +1,17 @@
+input interfaceEthernetConfigInput {
+    interface: String
+    address: String
+    description: String
+}
+
+type interfaceEthernetConfig {
+    interface: String
+    address: String
+    description: String
+}
+
+type createInterfaceEthernetResult {
+    data: interfaceEthernetConfig
+    success: Boolean!
+    errors: [String]
+}

@@ -1,0 +1,13 @@
+schema {
+    query: Query
+    mutation: Mutation
+}
+
+type Query {
+    _dummy: String
+}
+
+type Mutation {
+    createDhcpServer(data: dhcpServerConfigInput): createDhcpServerResult
+    createInterfaceEthernet(data: interfaceEthernetConfigInput): createInterfaceEthernetResult
+}
