@@ -1,0 +1,4 @@
+
+users = dict()
+messages = []
+queues = []
