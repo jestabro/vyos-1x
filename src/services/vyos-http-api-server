@@ -608,18 +608,16 @@ def show_op(data: ShowModel):
 
     return success(res)
 
+# GraphQL integration
 
 api.state.init()
 
+from api.graphql.mutations import mutation
+from api.graphql.directives import DataDirective
+
 type_defs = load_schema_from_path("/usr/libexec/vyos/services/api/graphql/schema/")
 
-from api.graphql.mutations import mutation, make_resolver
-
-# need to iterate over mutations
-for mname in ('createDhcpServer', 'createInterfaceEthernet'):
-    make_resolver(mname)
-
-schema = make_executable_schema(type_defs, mutation, snake_case_fallback_resolvers)
+schema = make_executable_schema(type_defs, mutation, snake_case_fallback_resolvers, directives={"generate": DataDirective})
 
 app.add_route('/graphql', GraphQL(schema, debug=True))
 

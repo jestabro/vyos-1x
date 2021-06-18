@@ -7,7 +7,9 @@ type Query {
     _dummy: String
 }
 
+directive @generate on FIELD_DEFINITION
+
 type Mutation {
-    createDhcpServer(data: dhcpServerConfigInput): createDhcpServerResult
-    createInterfaceEthernet(data: interfaceEthernetConfigInput): createInterfaceEthernetResult
+    createDhcpServer(data: dhcpServerConfigInput) : createDhcpServerResult @generate
+    createInterfaceEthernet(data: interfaceEthernetConfigInput) : createInterfaceEthernetResult @generate
 }

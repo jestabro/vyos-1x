@@ -60,4 +60,6 @@ def make_resolver(mutation_name):
                 "errors": [str(error)]
             }
 
+    return func_impl
+
 
