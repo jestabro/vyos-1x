@@ -1,0 +1,48 @@
+
+Example using GraphQL mutations to configure a DHCP server:
+
+This assumes that the http-api is running:
+
+'set service https api'
+
+One can configure an address on an interface, and configure the DHCP server
+to run with that address as default router with:
+
+mutation {
+  createInterfaceEthernet (data: {interface: "eth1",
+                                  address: "192.168.0.1/24",
+                                  description: "BOB"}) {
+    success
+    errors
+    data {
+      address
+    }
+  }
+}
+
+mutation {
+  createDhcpServer(data: {sharedNetworkName: "BOB",
+                          subnet: "192.168.0.0/24",
+                          defaultRouter: "192.168.0.1",
+                          dnsServer: "192.168.0.1",
+                          domainName: "vyos.net",
+                          lease: 86400,
+                          range: 0,
+                          start: "192.168.0.9",
+                          stop: "192.168.0.254",
+                          dnsForwardingAllowFrom: "192.168.0.0/24",
+                          dnsForwardingCacheSize: 0,
+                          dnsForwardingListenAddress: "192.168.0.1"}) {
+    success
+    errors
+    data {
+      defaultRouter
+    }
+  }
+}
+
+These requests can be set in the GraphQL playground, or made with curl:
+
+curl -k -H 'Content-Type: application/json' -d '{"query": "{hello}"}' https://{{ host_address }}/graphql
+
+replacing the query with the above mutations as JSON.
