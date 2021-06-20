@@ -12,3 +12,4 @@ class DataDirective(SchemaDirectiveVisitor):
 
         func = make_resolver(name)
         field.resolve = func
+        return field
