@@ -615,7 +615,10 @@ api.state.init()
 from api.graphql.mutations import mutation
 from api.graphql.directives import DataDirective
 
-type_defs = load_schema_from_path("/usr/libexec/vyos/services/api/graphql/schema/")
+# move to defaults
+graphql_schema_dir = '/usr/libexec/vyos/services/api/graphql/schema/'
+
+type_defs = load_schema_from_path(graphql_schema_dir)
 
 schema = make_executable_schema(type_defs, mutation, snake_case_fallback_resolvers, directives={"generate": DataDirective})
 

@@ -1,7 +1,7 @@
 input interfaceEthernetConfigInput {
     interface: String
     address: String
-    replace: Boolean = false
+    replace: Boolean = true
     description: String
 }
 

@@ -1,13 +1,33 @@
+from ariadne import convert_camel_case_to_snake
+from vyos.template import render
 
 class Recipe(object):
-    def __init__(self, session, command_file):
+    def __init__(self, session, data):
         self._session = session
-        self._cmd_file = command_file
+        self.data = data
+        self._name = convert_camel_case_to_snake(type(self).__name__)
+
+    @property
+    def data(self):
+        return self.__data
+
+    @data.setter
+    def data(self, data):
+        if isinstance(data, dict):
+            self.__data = data
+        else:
+            raise ValueError("data must be of type dict")
 
     def configure(self):
         session = self._session
-        cmd_file = self._cmd_file
+        data = self.data
+        func_base_name = self._name
+
+        cmd_file = f'/usr/share/vyos/{func_base_name}.cmds'
+        tmpl_file = f'graphql/{func_base_name}.tmpl'
+
         try:
+            render(cmd_file, tmpl_file, data)
             commands = []
             with open(cmd_file) as f:
                 lines = f.readlines()
