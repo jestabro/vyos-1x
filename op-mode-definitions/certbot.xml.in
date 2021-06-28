@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<!-- Let's Encrypt certificate management -->
+<interfaceDefinition>
+  <node name="generate">
+    <children>
+      <node name="certbot">
+        <properties>
+          <help>Request Let's Encrypt certificate</help>
+        </properties>
+        <children>
+          <tagNode name="email">
+            <properties>
+              <help>Email address to associate with certificate, or 'none' (discouraged)</help>
+            </properties>
+            <children>
+              <tagNode name="domains">
+                <properties>
+                  <help>Domain name(s) for which to obtain certificate</help>
+                </properties>
+                <command>sudo ${vyos_op_scripts_dir}/certbot.py --request --email "$4" --domains "$6"</command>
+              </tagNode>
+            </children>
+          </tagNode>
+        </children>
+      </node>
+    </children>
+  </node>
+  <node name="show">
+    <children>
+      <node name="certbot">
+        <properties>
+          <help>Show Let's Encrypt certificate information</help>
+        </properties>
+        <children>
+          <leafNode name="domains">
+            <properties>
+              <help>Show domains for which a Let's Encrypt certificate exists</help>
+            </properties>
+            <command>sudo ${vyos_op_scripts_dir}/certbot.py --show-domains</command>
+          </leafNode>
+          <leafNode name="paths">
+            <properties>
+              <help>Show paths for which a Let's Encrypt certificate exists</help>
+            </properties>
+            <command>sudo ${vyos_op_scripts_dir}/certbot.py --show-paths</command>
+          </leafNode>
+          <leafNode name="cert-names">
+            <properties>
+              <help>Show certificate names for which a Let's Encrypt certificate exists</help>
+            </properties>
+            <command>sudo ${vyos_op_scripts_dir}/certbot.py --show-certs</command>
+          </leafNode>
+        </children>
+      </node>
+    </children>
+  </node>
+  <node name="revoke">
+    <children>
+      <node name="certbot">
+        <properties>
+          <help>Revoke and delete Let's Encrypt certificate</help>
+        </properties>
+        <children>
+          <tagNode name="cert-name">
+            <properties>
+              <help>Name of certificate to revoke</help>
+            </properties>
+            <command>sudo ${vyos_op_scripts_dir}/certbot.py --revoke --cert-name "$4"</command>
+          </tagNode>
+        </children>
+      </node>
+    </children>
+  </node>
+</interfaceDefinition>

@@ -139,7 +139,7 @@
                   </leafNode>
                 </children>
               </node>
-              <node name="certbot" owner="${vyos_conf_scripts_dir}/le_cert.py">
+              <node name="certbot">
                 <properties>
                   <help>Request or apply a letsencrypt certificate for domain-name</help>
                 </properties>

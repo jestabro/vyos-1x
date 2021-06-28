@@ -33,6 +33,16 @@ dependencies = [
     'https.py',
 ]
 
+def get_certbot_domains():
+    show_cmd = f'sudo certbot --config-dir {vyos_certbot_dir} certificates'
+    show_out = cmd(show_cmd, raising=RuntimeError, message="certbot show failed")
+    lines = show_out.splitlines()
+    domains = []
+    for line in lines:
+        if 'Domains' in line:
+            domains = domains + line.split()[1:]
+    return domains
+
 def request_certbot(cert):
     email = cert.get('email')
     if email is not None:
@@ -77,6 +87,13 @@ def verify(cert):
         raise ConfigError("At least one domain name is required to"
                           " request a letsencrypt certificate.")
 
+# check against existing domains
+    domains = get_certbot_domains()
+    domain = cert['domains']
+    if domain not in domains:
+        raise ConfigError(f'No existing certificate for domain {domain}; please execute:\n "run generate certbot email <email addr> domains {domain}"')
+# remove all email refs
+
     if 'email' not in cert:
         raise ConfigError("An email address is required to request"
                           " a letsencrypt certificate.")
@@ -87,11 +104,12 @@ def generate(cert):
 
     # certbot will attempt to reload nginx, even with 'certonly';
     # start nginx if not active
-    ret = call('systemctl is-active --quiet nginx.service')
-    if ret:
-        call('systemctl start nginx.service')
+#    ret = call('systemctl is-active --quiet nginx.service')
+#    if ret:
+#        call('systemctl start nginx.service')
 
-    request_certbot(cert)
+# remove this
+#    request_certbot(cert)
 
 def apply(cert):
     if cert is not None:
