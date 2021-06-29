@@ -8,32 +8,9 @@ import argparse
 import vyos.defaults
 from vyos.util import cmd, call
 from vyos.configquery import query_context
+from vyos.certbot_util import get_certbot_info
 
 vyos_certbot_dir = vyos.defaults.directories['certbot']
-
-def get_certbot_info():
-    '''Gather the output of 'certbot certificate' into a dictionary; certbot
-    could really use an API.
-    '''
-    show_cmd = f'sudo certbot --config-dir {vyos_certbot_dir} certificates'
-    show_out = cmd(show_cmd, raising=RuntimeError,
-                   message="certbot certificates failed")
-    info = re.split(r'.(?=Certificate Name)', show_out)
-    info = [l for l in info if 'Certificate Name' in l]
-    certbot_info = {}
-    for entry in info:
-        lines = entry.splitlines()
-        for line in lines:
-            if 'Certificate Name' in line:
-                name = line.split()[2]
-                certbot_info[name] = {}
-            if 'Domains' in line:
-                certbot_info[name]['domains'] = line.split()[1:]
-            if 'Certificate Path' in line:
-                path = line.split()[2:][0]
-                path = os.path.split(path)[0]
-                certbot_info[name]['path'] = path
-    return certbot_info
 
 def _certificate_name_from_domain(domain: str):
     info = get_certbot_info()

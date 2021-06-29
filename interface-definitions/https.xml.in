@@ -141,12 +141,12 @@
               </node>
               <node name="certbot">
                 <properties>
-                  <help>Request or apply a letsencrypt certificate for domain-name</help>
+                  <help>Apply a letsencrypt certificate for domain-name</help>
                 </properties>
                 <children>
                   <leafNode name="domain-name">
                     <properties>
-                      <help>Domain name(s) for which to obtain certificate</help>
+                      <help>Domain name(s) to use with a Let's Encrypt certificate</help>
                       <multi/>
                     </properties>
                   </leafNode>

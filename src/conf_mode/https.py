@@ -25,6 +25,7 @@ from vyos.config import Config
 from vyos import ConfigError
 from vyos.util import call
 from vyos.template import render
+from vyos.cerbot_util import get_certbot_info
 
 from vyos import airbag
 airbag.enable()
@@ -81,7 +82,7 @@ def get_config(config=None):
 
     cert_dict = https_dict.get('certificates', {})
 
-        # self-signed certificate
+    # self-signed certificate
 
     vyos_cert_data = {}
     if 'system-generated-certificate' in list(cert_dict):
@@ -90,7 +91,7 @@ def get_config(config=None):
         for block in server_block_list:
             block['vyos_cert'] = vyos_cert_data
 
-        # letsencrypt certificate using certbot
+    # letsencrypt certificate using certbot
 
     certbot = False
     cert_domains = cert_dict.get('certbot', {}).get('domain-name', [])
@@ -150,6 +151,15 @@ def verify(https):
                 return None
         raise ConfigError("At least one 'virtual-host <id> server-name' "
                           "matching the 'certbot domain-name' is required.")
+
+    # check for existence of certificate
+    info = get_certbot_info()
+    domains = []
+    domain = certbot['domains']
+    for n in list(info):
+        domains = domains + info[n]['domains']
+#    if
+
     return None
 
 def generate(https):
