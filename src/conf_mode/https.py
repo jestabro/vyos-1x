@@ -25,7 +25,7 @@ from vyos.config import Config
 from vyos import ConfigError
 from vyos.util import call
 from vyos.template import render
-from vyos.cerbot_util import get_certbot_info
+from vyos.certbot_util import get_certbot_info
 
 from vyos import airbag
 airbag.enable()

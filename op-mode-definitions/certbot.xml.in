@@ -17,7 +17,7 @@
                 <properties>
                   <help>Domain name(s) for which to obtain certificate</help>
                 </properties>
-                <command>sudo ${vyos_op_scripts_dir}/certbot.py --request --email "$4" --domains "$6"</command>
+                <command>sudo ${vyos_op_scripts_dir}/certbot_op.py --request --email "$4" --domains "$6"</command>
               </tagNode>
             </children>
           </tagNode>
@@ -36,19 +36,19 @@
             <properties>
               <help>Show domains for which a Let's Encrypt certificate exists</help>
             </properties>
-            <command>sudo ${vyos_op_scripts_dir}/certbot.py --show-domains</command>
+            <command>sudo ${vyos_op_scripts_dir}/certbot_op.py --show-domains</command>
           </leafNode>
           <leafNode name="paths">
             <properties>
               <help>Show paths for which a Let's Encrypt certificate exists</help>
             </properties>
-            <command>sudo ${vyos_op_scripts_dir}/certbot.py --show-paths</command>
+            <command>sudo ${vyos_op_scripts_dir}/certbot_op.py --show-paths</command>
           </leafNode>
           <leafNode name="cert-names">
             <properties>
               <help>Show certificate names for which a Let's Encrypt certificate exists</help>
             </properties>
-            <command>sudo ${vyos_op_scripts_dir}/certbot.py --show-certs</command>
+            <command>sudo ${vyos_op_scripts_dir}/certbot_op.py --show-certs</command>
           </leafNode>
         </children>
       </node>
@@ -65,7 +65,7 @@
             <properties>
               <help>Name of certificate to revoke</help>
             </properties>
-            <command>sudo ${vyos_op_scripts_dir}/certbot.py --revoke --cert-name "$4"</command>
+            <command>sudo ${vyos_op_scripts_dir}/certbot_op.py --revoke --cert-name "$4"</command>
           </tagNode>
         </children>
       </node>
