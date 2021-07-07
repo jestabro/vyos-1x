@@ -11,29 +11,39 @@ from certbot_nginx._internal import parser
 
 vyos_certbot_dir = vyos.defaults.directories['certbot']
 
-def get_certbot_info():
-    '''Gather the output of 'certbot certificate' into a dictionary; certbot
-    could really use an API.
-    '''
-    show_cmd = f'sudo certbot --config-dir {vyos_certbot_dir} certificates'
-    show_out = cmd(show_cmd, raising=RuntimeError,
-                   message="certbot certificates failed")
-    info = re.split(r'.(?=Certificate Name)', show_out)
-    info = [l for l in info if 'Certificate Name' in l]
-    certbot_info = {}
-    for entry in info:
-        lines = entry.splitlines()
-        for line in lines:
-            if 'Certificate Name' in line:
-                name = line.split()[2]
-                certbot_info[name] = {}
-            if 'Domains' in line:
-                certbot_info[name]['domains'] = line.split()[1:]
-            if 'Certificate Path' in line:
-                path = line.split()[2:][0]
-                path = os.path.split(path)[0]
-                certbot_info[name]['path'] = path
-    return certbot_info
+class CertbotData:
+    def __init__(self):
+        '''Gather the output of 'certbot certificate' into a dictionary; certbot
+        could really use a library API (cf.
+        https://github.com/certbot/certbot/issues/4065).
+        '''
+        self.names = {}
+        show_cmd = f'sudo certbot --config-dir {vyos_certbot_dir} certificates'
+        show_out = cmd(show_cmd, raising=RuntimeError,
+                       message="certbot certificates failed")
+        info = re.split(r'.(?=Certificate Name)', show_out)
+        info = [l for l in info if 'Certificate Name' in l]
+        for entry in info:
+            lines = entry.splitlines()
+            for line in lines:
+                if 'Certificate Name' in line:
+                    name = line.split()[2]
+                    self.names[name] = {}
+                if 'Domains' in line:
+                    self.names[name]['domains'] = line.split()[1:]
+                if 'Certificate Path' in line:
+                    path = line.split()[2:][0]
+                    path = os.path.split(path)[0]
+                    self.names[name]['path'] = path
+
+    def certificate_name_from_domain(self, domain: str):
+        '''Get the 'certificate name' from a given domain name (this is also
+        a path component for cert location).
+        '''
+        for n in self.names:
+            if domain in self.names[n]['domains']:
+                return n
+        return None
 
 
 NAME_RANK = 0
@@ -76,7 +86,7 @@ def _select_best_name_match(matches):
     """
     if not matches:
         return None
-    elif matches[0]['rank'] in [START_WILDCARD_RANK, END_WILDCARD_RANK]:
+    if matches[0]['rank'] in [START_WILDCARD_RANK, END_WILDCARD_RANK]:
         rank = matches[0]['rank']
         wildcards = [x for x in matches if x['rank'] == rank]
         return max(wildcards, key=lambda x: len(x['name']))['vhost']

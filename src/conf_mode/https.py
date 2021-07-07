@@ -25,7 +25,7 @@ from vyos.config import Config
 from vyos import ConfigError
 from vyos.util import call
 from vyos.template import render
-from vyos.certbot_util import get_certbot_info
+from vyos.certbot_util import CertbotData
 
 from vyos import airbag
 airbag.enable()
@@ -95,6 +95,7 @@ def get_config(config=None):
 
     certbot = False
     cert_domains = cert_dict.get('certbot', {}).get('domain-name', [])
+    cd = CertbotData()
     if cert_domains:
         certbot = True
         for domain in cert_domains:
@@ -104,8 +105,7 @@ def get_config(config=None):
                 for sb in sub_list:
                     sb['certbot'] = True
                     sb['certbot_dir'] = certbot_dir
-                    # certbot organizes certificates by first domain
-                    sb['certbot_domain_dir'] = cert_domains[0]
+                    sb['certbot_domain_dir'] = cd.certificate_name_from_domain(domain)
 
     # get api data
 
@@ -146,18 +146,23 @@ def verify(https):
         return None
 
     if https['certbot']:
+        found = False
         for sb in https['server_block_list']:
             if sb['certbot']:
-                return None
-        raise ConfigError("At least one 'virtual-host <id> server-name' "
-                          "matching the 'certbot domain-name' is required.")
+                found = True
+                if sb['certbot_domain_dir'] is None:
+                    raise ConfigError('Let\'s Encrypt certificate not found! '
+                        'Execute: "run generate certbot email <text|\'none\'> domains <text>"')
+        if not found:
+            raise ConfigError("At least one 'virtual-host <id> server-name' "
+                              "matching a 'certbot domain-name' is required.")
 
     # check for existence of certificate
-    info = get_certbot_info()
-    domains = []
-    domain = certbot['domains']
-    for n in list(info):
-        domains = domains + info[n]['domains']
+#    info = get_certbot_info()
+#    domains = []
+#    domain = certbot['domains']
+#    for n in list(info):
+#        domains = domains + info[n]['domains']
 #    if
 
     return None

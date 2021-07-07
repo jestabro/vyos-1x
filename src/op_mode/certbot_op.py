@@ -1,23 +1,14 @@
 #!/usr/bin/env python3
 
-import os
-import re
 import sys
 import argparse
 
 import vyos.defaults
 from vyos.util import cmd, call
 from vyos.configquery import query_context
-from vyos.certbot_util import get_certbot_info
+from vyos.certbot_util import CertbotData
 
 vyos_certbot_dir = vyos.defaults.directories['certbot']
-
-def _certificate_name_from_domain(domain: str):
-    info = get_certbot_info()
-    for n in list(info):
-        if domain in info[n]['domains']:
-            return n
-    return None
 
 def request():
     query, _ = query_context()
@@ -51,8 +42,9 @@ def request():
     call('systemctl restart certbot.timer')
 
 def revoke():
+    c = CertbotData()
     cert_name = args.cert_name
-    cert_name = _certificate_name_from_domain(cert_name)
+    cert_name = c.certificate_name_from_domain(cert_name)
 
     revoke_cmd = f'sudo certbot revoke --test-cert --delete-after-revoke --noninteractive --config-dir {vyos_certbot_dir} --cert-name {cert_name}'
     revoke_out = cmd(revoke_cmd, raising=RuntimeError, message="certbot revoke failed")
@@ -60,19 +52,19 @@ def revoke():
     print(f"revoke: {revoke_out}")
 
 def show_cert_names():
-    info = get_certbot_info()
-    for n in list(info):
+    c = CertbotData()
+    for n in c.names:
         print(n)
 
 def show_domains():
-    info = get_certbot_info()
-    for n in list(info):
-        print(info[n]['domains'])
+    c = CertbotData()
+    for n in c.names:
+        print(c.names[n]['domains'])
 
 def show_paths():
-    info = get_certbot_info()
-    for n in list(info):
-        print(info[n]['path'])
+    c = CertbotData()
+    for n in c.names:
+        print(c.names[n]['path'])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Request Let's Encrypt certificate")
@@ -86,9 +78,6 @@ if __name__ == '__main__':
     parser.add_argument('--cert-name', action='store', type=str)
 
     args = parser.parse_args()
-
-    print(f"email is {args.email}")
-    print(f"domains are {args.domains}")
 
     try:
         if args.request:
