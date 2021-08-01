@@ -3,6 +3,7 @@ Section: contrib/net
 Priority: extra
 Maintainer: VyOS Package Maintainers <maintainers@vyos.net>
 Build-Depends:
+  cython3,
   debhelper (>= 9),
   dh-python,
   fakeroot,
