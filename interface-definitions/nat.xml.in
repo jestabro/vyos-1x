@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/nat-version.xml.i>
   <node name="nat" owner="${vyos_conf_scripts_dir}/nat.py">
     <properties>
       <help>Network Address Translation (NAT) parameters</help>

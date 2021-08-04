@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/firewall-version.xml.i>
   <node name="firewall">
     <children>
       <node name="options">

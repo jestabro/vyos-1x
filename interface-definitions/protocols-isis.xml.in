@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <interfaceDefinition>
+  #include <include/version/isis-version.xml.i>
   <node name="protocols">
     <children>
       <node name="isis" owner="${vyos_conf_scripts_dir}/protocols_isis.py">

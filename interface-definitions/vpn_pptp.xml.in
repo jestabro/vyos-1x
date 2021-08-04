@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/pptp-version.xml.i>
   <node name="vpn">
     <children>
       <node name="pptp" owner="${vyos_conf_scripts_dir}/vpn_pptp.py">

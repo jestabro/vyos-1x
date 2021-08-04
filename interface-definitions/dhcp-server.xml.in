@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <!-- DHCP server configuration -->
 <interfaceDefinition>
+  #include <include/version/dhcp-server-version.xml.i>
   <node name="service">
     <children>
       <node name="dhcp-server" owner="${vyos_conf_scripts_dir}/dhcp_server.py">

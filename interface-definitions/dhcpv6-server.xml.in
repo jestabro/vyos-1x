@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <!-- DHCPv6 server configuration -->
 <interfaceDefinition>
+  #include <include/version/dhcpv6-server-version.xml.i>
   <node name="service">
     <children>
       <node name="dhcpv6-server" owner="${vyos_conf_scripts_dir}/dhcpv6_server.py">

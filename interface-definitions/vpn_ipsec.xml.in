@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/ipsec-version.xml.i>
   <node name="vpn">
     <properties>
       <help>Virtual Private Network (VPN)</help>

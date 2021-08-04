@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <!-- Policy local-route -->
 <interfaceDefinition>
+  #include <include/version/policy-version.xml.i>
   <node name="policy">
     <children>
       <node name="local-route" owner="${vyos_conf_scripts_dir}/policy-local-route.py">

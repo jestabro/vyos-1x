@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/ssh-version.xml.i>
   <node name="service">
     <properties>
       <help>System services</help>

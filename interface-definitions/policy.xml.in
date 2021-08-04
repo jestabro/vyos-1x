@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/policy-version.xml.i>
   <node name="policy" owner="${vyos_conf_scripts_dir}/policy.py">
     <properties>
       <priority>200</priority>

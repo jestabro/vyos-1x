@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <!-- UDP broadcast relay configuration -->
 <interfaceDefinition>
+  #include <include/version/broadcast-relay-version.xml.i>
   <node name="service">
     <children>
       <node name="broadcast-relay" owner="${vyos_conf_scripts_dir}/bcast_relay.py">

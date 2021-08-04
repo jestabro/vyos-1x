@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/system-version.xml.i>
   <node name="system">
     <properties>
       <help>System parameters</help>

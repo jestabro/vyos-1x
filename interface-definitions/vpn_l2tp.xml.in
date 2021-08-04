@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/l2tp-version.xml.i>
   <node name="vpn">
     <children>
       <node name="l2tp" owner="${vyos_conf_scripts_dir}/vpn_l2tp.py">

@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/conntrack-sync-version.xml.i>
   <node name="service">
     <children>
       <node name="conntrack-sync" owner="${vyos_conf_scripts_dir}/conntrack_sync.py">

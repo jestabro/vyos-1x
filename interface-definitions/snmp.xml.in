@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <!-- SNMP forwarder configuration -->
 <interfaceDefinition>
+  #include <include/version/snmp-version.xml.i>
   <node name="service">
     <children>
       <node name="snmp" owner="${vyos_conf_scripts_dir}/snmp.py">

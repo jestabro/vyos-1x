@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/salt-version.xml.i>
   <node name="service">
     <children>
       <node name="salt-minion" owner="${vyos_conf_scripts_dir}/salt-minion.py">

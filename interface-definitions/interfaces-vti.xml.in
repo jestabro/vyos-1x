@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/interfaces-version.xml.i>
   <node name="interfaces">
     <children>
       <tagNode name="vti" owner="${vyos_conf_scripts_dir}/interfaces-vti.py">
