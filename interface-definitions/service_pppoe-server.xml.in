@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <interfaceDefinition>
+  #include <include/version/pppoe-server-version.xml.i>
   <node name="service">
     <children>
       <node name="pppoe-server" owner="${vyos_conf_scripts_dir}/service_pppoe-server.py">
