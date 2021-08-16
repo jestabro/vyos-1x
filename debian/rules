@@ -40,7 +40,7 @@ override_dh_auto_install:
 
 	cd python; python3 setup.py install --install-layout=deb --root ../$(DIR); cd ..
 
-	cd python/vyos/cy_netlink; python3 setup.py install --install-layout=deb --root ../../../$(DIR); cd ../../..
+#	cd python/vyos/cy_netlink; python3 setup.py install --install-layout=deb --root ../../../$(DIR); cd ../../..
 
 	# Install scripts
 	mkdir -p $(DIR)/$(VYOS_SBIN_DIR)
