@@ -10,10 +10,7 @@ def packages(directory):
     ]
 
 extensions = [
-    Extension("netlink", ["vyos/cy_netlink/cy_netlink.pyx"],
-        include_dirs=[...],
-        libraries=[...],
-        library_dirs=[...],
+    Extension("vyos.cy_netlink", ["vyos/cy_netlink/cy_netlink.pyx"])
 ]
 
 setup(
