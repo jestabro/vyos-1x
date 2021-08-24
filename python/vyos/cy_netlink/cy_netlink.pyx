@@ -5,26 +5,20 @@ from cython.operator cimport dereference
 #from cpython.ref cimport PyObject
 cimport cy_netlink
 
-#cdef extern from *:
-#    ctypedef Py_ssize_t Py_intptr_t
-
-#cpdef (unsigned int, unsigned short, unsigned short, unsigned int, unsigned int) get_header(bytes buf):
 cpdef nlmsghdr get_header(bytes buf):
     cdef const unsigned char[:] buf_view = buf
     cdef char* buf_ptr = <char*>&buf_view[0]
-    cdef nlmsghdr hdr
-    memcpy(&hdr, buf_ptr, sizeof(nlmsghdr))
+    cdef nlmsghdr hdr = dereference(<nlmsghdr*>buf_ptr)
+#    memcpy(&hdr, buf_ptr, sizeof(nlmsghdr))
     return hdr
 #    return (hdr.nlmsg_len, hdr.nlmsg_type, hdr.nlmsg_flags, hdr.nlmsg_seq, hdr.nlmsg_pid)
 
-#cpdef (unsigned short, unsigned short) get_rtattr(bytes buf):
 cpdef rtattr get_rtattr(bytes buf):
     cdef const unsigned char[:] buf_view = buf
-    print(f"JSE buf: {buf}, buf_view: {buf_view}")
+#    print(f"JSE buf: {buf}, buf_view: {buf_view}")
     cdef char* buf_ptr = <char*>&buf_view[0]
-#    cdef rtattr attr = dereference(<rtattr*>buf_ptr)
-    cdef rtattr attr
-    memcpy(&attr, buf_ptr, sizeof(rtattr))
+    cdef rtattr attr = dereference(<rtattr*>buf_ptr)
+#    memcpy(&attr, buf_ptr, sizeof(rtattr))
     return attr
 #    return (attr.rta_len, attr.rta_type)
 
@@ -44,6 +38,11 @@ cpdef bytes rta_data(bytes buf):
     cdef char* buf_ptr = <char*>&buf_view[0]
     cdef bytes data = <bytes>(buf_ptr + RTA_LENGTH(0))
     return data
+
+cpdef bytes rta_next(bytes p, int attrlen):
+    cdef rtattr* attr = <rtattr*>p
+    cdef rtattr* ret = RTA_NEXT(attr, attrlen)
+    return (<bytes>ret, attrlen)
 
 #cpdef object py_rta_data(rtattr):
 #    cdef bytes data_ptr = <bytes>RTA_DATA(rtattr)

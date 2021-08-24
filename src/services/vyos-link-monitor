@@ -75,11 +75,16 @@ while True:
 #        rta_data = nl.rta_data(rtattr)
         rta_data = nl.rta_data(data)
 
-        increment = (rta_len + 4 - 1) & ~(4 - 1)
+#        increment = (rta_len + 4 - 1) & ~(4 - 1)
         rta_increment = nl.rta_align(rta_len)
-        print(f"JSE increment {increment} rta_increment {rta_increment}")
-        data = data[increment:]
-        remaining -= increment
+#        print(f"JSE increment {increment} rta_increment {rta_increment}")
+#        data = data[increment:]
+#        remaining -= increment
+        ret_data, ret_len = nl.rta_next(data, remaining)
+        print(f"JSE ret_data: {ret_data}, ret_len: {ret_len}")
+
+        data = data[rta_increment:]
+        remaining -= rta_increment
 
         # Hoorah, a link is up!
         if rta_type == nl.IFLA_IFNAME:
