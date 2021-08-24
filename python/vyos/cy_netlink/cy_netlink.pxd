@@ -5,6 +5,7 @@ cdef extern from "linux/netlink.h":
     cpdef enum:
         NLMSG_NOOP
         NLMSG_ERROR
+    cdef int NLMSG_HDRLEN
 cdef extern from "linux/rtnetlink.h":
     cpdef enum:
         RTMGRP_LINK
@@ -20,8 +21,8 @@ cdef extern from "linux/rtnetlink.h":
         unsigned short  rta_len
         unsigned short  rta_type
     cdef bint RTA_OK(rtattr, int)
-
-#cpdef bint RTA_OK(rtattr, int)
+    cdef int RTA_LENGTH(int)
+#    cdef void* RTA_DATA(rtattr)
 
 cpdef (unsigned int, unsigned short, unsigned short, unsigned int, unsigned int) get_header(bytes)
 

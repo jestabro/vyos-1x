@@ -4,7 +4,7 @@ import os
 import socket
 import struct
 #import cy_netlink
-import cy_netlink as nl
+import vyos.cy_netlink as nl
 #from cy_netlink import RTMGRP_LINK
 
 # These constants map to constants in the Linux kernel. This is a crappy
@@ -61,7 +61,8 @@ while True:
 #        if !RTA_OK(?):
 #            break
 
-        rta_data = data[4:rta_len]
+#        rta_data = data[4:rta_len]
+        rta_data = nl.RTA_DATA(data)
 
         increment = (rta_len + 4 - 1) & ~(4 - 1)
         data = data[increment:]
