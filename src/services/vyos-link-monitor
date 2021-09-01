@@ -25,7 +25,7 @@ s.bind((os.getpid(), nl.RTMGRP_LINK))
 
 while True:
     data = s.recv(65535)
-#    print(f"JSE type(data): {type(data)}")
+    print(f"JSE type(data): {type(data)}")
 #    msg_len, msg_type, flags, seq, pid = struct.unpack("=LHHLL", data[:16])
 #    msg_len, msg_type, flags, seq, pid = nl.get_header(data)
     nlh = nl.get_header(data)
@@ -80,11 +80,20 @@ while True:
 #        print(f"JSE increment {increment} rta_increment {rta_increment}")
 #        data = data[increment:]
 #        remaining -= increment
-        ret_data, ret_len = nl.rta_next(data, remaining)
-        print(f"JSE ret_data: {ret_data}, ret_len: {ret_len}")
+#        test_int = remaining
+#        print(f"JSE test_int: {test_int}")
+#        ret_data = nl.rta_next(data, [test_int])
+#        print(f"JSE test_int: {test_int}")
+#        step = nl.rta_next(data, remaining)
+#        print(f"JSE ret_data: {step._data}, ret_len: {step._position}")
+#        print(f"JSE ret_data: {ret_data}")
 
         data = data[rta_increment:]
         remaining -= rta_increment
+
+        test_int = remaining
+        ret_data = nl.rta_next(data, [test_int])
+        print(f"JSE ret_data: {ret_data}")
 
         # Hoorah, a link is up!
         if rta_type == nl.IFLA_IFNAME:
