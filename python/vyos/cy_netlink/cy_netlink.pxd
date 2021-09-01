@@ -25,7 +25,7 @@ cdef extern from "linux/rtnetlink.h":
     cdef bint RTA_OK(rtattr*, int)
     cdef int RTA_LENGTH(int)
     cdef int RTM_PAYLOAD(nlmsghdr*)
-    cdef rtattr* RTA_NEXT(rtattr*, int)
+    rtattr* RTA_NEXT(rtattr*, int)
 #    cdef void* RTA_DATA(rtattr)
 
 #cpdef (unsigned int, unsigned short, unsigned short, unsigned int, unsigned int) get_header(bytes)

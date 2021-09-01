@@ -5,6 +5,11 @@ from cython.operator cimport dereference
 #from cpython.ref cimport PyObject
 cimport cy_netlink
 
+class Step:
+    def __init__(self, bytes data, int pos):
+        self._data = data
+        self._position = pos
+
 cpdef nlmsghdr get_header(bytes buf):
     cdef const unsigned char[:] buf_view = buf
     cdef char* buf_ptr = <char*>&buf_view[0]
@@ -39,10 +44,21 @@ cpdef bytes rta_data(bytes buf):
     cdef bytes data = <bytes>(buf_ptr + RTA_LENGTH(0))
     return data
 
-cpdef bytes rta_next(bytes p, int attrlen):
-    cdef rtattr* attr = <rtattr*>p
-    cdef rtattr* ret = RTA_NEXT(attr, attrlen)
-    return (<bytes>ret, attrlen)
+#cdef pre_rta_next(rtattr *attr, int *attr_len):
+#    cdef rtattr* ret = RTA_NEXT(attr, dereference(attr_len))
+#    return ret
+
+cpdef bytes rta_next(bytes buf, list len_list):
+    cdef const unsigned char[:] buf_view = buf
+    cdef rtattr* attr = <rtattr*>&buf_view[0]
+    cdef int attrlen = len_list[0]
+    print(f"JSE 1 attrlen: {attrlen}")
+#    cdef rtattr* ret = pre_rta_next(attr, &attrlen)
+    cdef char* ret = <char*>RTA_NEXT(attr, attrlen)
+    print(f"JSE 2 attrlen: {attrlen}")
+    len_list[0] = attrlen
+    cdef bytes data = <bytes>ret
+    return data
 
 #cpdef object py_rta_data(rtattr):
 #    cdef bytes data_ptr = <bytes>RTA_DATA(rtattr)
