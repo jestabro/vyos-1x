@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+#
+# Copyright (C) 2021 VyOS maintainers and contributors
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or later as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+
+import os
+import sys
+import time
+import socket
+import logging
+import vyos.cy_netlink as nl
+
+debug = True
+
+logger = logging.getLogger(__name__)
+logs_handler = logging.StreamHandler()
+logger.addHandler(logs_handler)
+
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+
+def nl_listen():
+    #try
+    s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
+    s.bind((os.getpid(), nl.RTMGRP_LINK))
+
+    while True:
+        data: bytes = s.recv(65535)
+        # check length ?
+        status: int = len(data)
+
+        nlh = nl.get_header(data)
+        while status > sys.getsizeof(nlh):
+            logging.debug(f"sizeof nlmsg header is {sys.getsize(nlh)}")
+            msg_type: int = nlh['nlmsg_type']
+            msg_len: int = nlh['nlmsg_len']
+
