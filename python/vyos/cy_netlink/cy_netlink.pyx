@@ -18,6 +18,12 @@ cpdef nlmsghdr get_header(bytes buf):
     return hdr
 #    return (hdr.nlmsg_len, hdr.nlmsg_type, hdr.nlmsg_flags, hdr.nlmsg_seq, hdr.nlmsg_pid)
 
+cpdef int get_nlmsg_hdrlen():
+    return NLMSG_HDRLEN
+
+cpdef int get_sizeof_header(nlmsghdr h):
+    return sizeof(h)
+
 cpdef rtattr get_rtattr(bytes buf):
     cdef const unsigned char[:] buf_view = buf
 #    print(f"JSE buf: {buf}, buf_view: {buf_view}")
@@ -32,6 +38,9 @@ cpdef int rtm_payload(nlmsghdr nlh):
 
 cpdef int rta_align(int len):
     return RTA_ALIGN(len)
+
+cpdef int nlmsg_align(int leng):
+    return NLMSG_ALIGN(leng)
 
 cpdef bint rta_ok(rtattr attr, int alen):
     return RTA_OK(&attr, alen)

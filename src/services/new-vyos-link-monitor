@@ -45,8 +45,27 @@ def nl_listen():
         status: int = len(data)
 
         nlh = nl.get_header(data)
-        while status > sys.getsizeof(nlh):
-            logging.debug(f"sizeof nlmsg header is {sys.getsize(nlh)}")
+        siz = nl.get_sizeof_header(nlh)
+        nlmsg_hdrlen = nl.get_nlmsg_hdrlen()
+        print(f"sizeof nlmsg header is {siz}")
+        print(f"status is {status}")
+
+        while status > nlmsg_hdrlen:
+            print(f"JSE what is nlh in Python ? Type: {type(nlh)}")
             msg_type: int = nlh['nlmsg_type']
             msg_len: int = nlh['nlmsg_len']
+            save_len: int = msg_len
 
+            # do things
+            print("JSE doing things")
+
+            status -= nl.nlmsg_align(save_len)
+            data = data[nl.nlmsg_align(save_len):]
+            if len(data) > nlmsg_hdrlen:
+                nlh = nl.get_header(data)
+
+def main():
+    nl_listen()
+
+if __name__ == '__main__':
+    main()
