@@ -21,6 +21,8 @@ import sys
 import time
 import socket
 import logging
+from types import SimpleNamespace
+
 import vyos.cy_netlink as nl
 
 debug = True
@@ -34,6 +36,18 @@ if debug:
 else:
     logger.setLevel(logging.INFO)
 
+def parse_rtattr(rta: dict, max_enum: int, leng: int) -> dict: 
+    sn = SimpleNamespace()
+    sn.len = leng
+    d = {}
+
+    while nl.rta_ok(rta, sn.len):
+        if rta['rta_type'] <= max_enum:
+            d['rta_type'] = rta
+        rta = nl.rta_next(rta, sn.len)
+
+    return d
+
 def nl_listen():
     #try
     s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
@@ -46,8 +60,10 @@ def nl_listen():
 
         nlh = nl.get_header(data)
         siz = nl.get_sizeof_header(nlh)
-        nlmsg_hdrlen = nl.get_nlmsg_hdrlen()
+#        nlmsg_hdrlen = nl.get_nlmsg_hdrlen()
+        nlmsg_hdrlen = nl.NLMSG_HDRLEN
         print(f"sizeof nlmsg header is {siz}")
+        print(f"nlmsg_hdrlen is {nlmsg_hdrlen}")
         print(f"status is {status}")
 
         while status > nlmsg_hdrlen:
@@ -58,6 +74,13 @@ def nl_listen():
 
             # do things
             print("JSE doing things")
+            # get iffinfomsg
+            # parse ifinfomsg as rtattr ?
+            # record ifUp and ifRun
+            #
+            # get ifaddrmsg
+            # parse ifaddrmsg as rtattr ?
+            # get addr
 
             status -= nl.nlmsg_align(save_len)
             data = data[nl.nlmsg_align(save_len):]

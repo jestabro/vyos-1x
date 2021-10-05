@@ -5,11 +5,6 @@ from cython.operator cimport dereference
 #from cpython.ref cimport PyObject
 cimport cy_netlink
 
-class Step:
-    def __init__(self, bytes data, int pos):
-        self._data = data
-        self._position = pos
-
 cpdef nlmsghdr get_header(bytes buf):
     cdef const unsigned char[:] buf_view = buf
     cdef char* buf_ptr = <char*>&buf_view[0]
@@ -18,8 +13,8 @@ cpdef nlmsghdr get_header(bytes buf):
     return hdr
 #    return (hdr.nlmsg_len, hdr.nlmsg_type, hdr.nlmsg_flags, hdr.nlmsg_seq, hdr.nlmsg_pid)
 
-cpdef int get_nlmsg_hdrlen():
-    return NLMSG_HDRLEN
+#cpdef int get_nlmsg_hdrlen():
+#    return NLMSG_HDRLEN
 
 cpdef int get_sizeof_header(nlmsghdr h):
     return sizeof(h)
@@ -57,7 +52,10 @@ cpdef bytes rta_data(bytes buf):
 #    cdef rtattr* ret = RTA_NEXT(attr, dereference(attr_len))
 #    return ret
 
-cpdef bytes rta_next(bytes buf, list len_list):
+cpdef rtattr rta_next(rtattr rta, int leng):
+    return dereference(RTA_NEXT(&rta, leng)
+
+cpdef bytes prev_rta_next(bytes buf, list len_list):
     cdef const unsigned char[:] buf_view = buf
     cdef rtattr* attr = <rtattr*>&buf_view[0]
     cdef int attrlen = len_list[0]

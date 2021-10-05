@@ -5,13 +5,14 @@ cdef extern from "linux/netlink.h":
     cpdef enum:
         NLMSG_NOOP
         NLMSG_ERROR
+        NLMSG_HDRLEN
     cdef struct nlmsghdr:
         unsigned int    nlmsg_len
         unsigned short  nlmsg_type
         unsigned short  nlmsg_flags
         unsigned int    nlmsg_seq
         unsigned int    nlmsg_pid
-    cdef int NLMSG_HDRLEN
+#    cdef int NLMSG_HDRLEN
     cdef int NLMSG_ALIGN(int)
 #    cdef int NLMSG_PAYLOAD(nlmsghdr*, len)
 cdef extern from "linux/rtnetlink.h":
@@ -37,4 +38,4 @@ cpdef rtattr get_rtattr(bytes)
 
 cpdef int get_sizeof_header(nlmsghdr)
 
-cpdef int get_nlmsg_hdrlen()
+#cpdef int get_nlmsg_hdrlen()

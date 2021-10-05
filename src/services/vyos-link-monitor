@@ -92,7 +92,7 @@ while True:
         remaining -= rta_increment
 
         test_int = remaining
-        ret_data = nl.rta_next(data, [test_int])
+        ret_data = nl.prev_rta_next(data, [test_int])
         print(f"JSE ret_data: {ret_data}")
 
         # Hoorah, a link is up!
