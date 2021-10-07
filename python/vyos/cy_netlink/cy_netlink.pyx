@@ -1,6 +1,6 @@
 
 #from cy_netlink cimport RTMGRP_LINK, RTM_NEWLINK, RTM_DELLINK, nlmsghdr
-from libc.string cimport memcpy
+from libc.string cimport memcpy, memset
 from cython.operator cimport dereference
 #from cpython.ref cimport PyObject
 cimport cy_netlink
@@ -13,26 +13,58 @@ cpdef nlmsghdr get_header(bytes buf):
     return hdr
 #    return (hdr.nlmsg_len, hdr.nlmsg_type, hdr.nlmsg_flags, hdr.nlmsg_seq, hdr.nlmsg_pid)
 
-#cpdef int get_nlmsg_hdrlen():
-#    return NLMSG_HDRLEN
+cpdef bytes Nlmsg_Data(bytes buf):
+    cdef const unsigned char[:] buf_view = buf
+    cdef char* buf_ptr = <char*>&buf_view[0]
+    buf_ptr = <char*>NLMSG_DATA(<nlmsghdr*>buf_ptr)
+    return <bytes>buf_ptr
+
+cpdef bytes ifla_rta(bytes buf):
+    cdef const unsigned char[:] buf_view = buf
+    cdef char* buf_ptr = <char*>&buf_view[0]
+    cdef char* ret_ptr = <char*>IFLA_RTA(<ifinfomsg*>buf_ptr)
+    return <bytes>ret_ptr
+
+cpdef bytes ifa_rta(bytes buf):
+    cdef const unsigned char[:] buf_view = buf
+    cdef char* buf_ptr = <char*>&buf_view[0]
+    buf_ptr = <char*>IFA_RTA(<ifaddrmsg*>buf_ptr)
+    return <bytes>buf_ptr
 
 cpdef int get_sizeof_header(nlmsghdr h):
     return sizeof(h)
+
+cpdef (unsigned char, unsigned short, int, unsigned int, unsigned int) get_ifinfomsg(bytes buf):
+    cdef const unsigned char[:] buf_view = buf
+    cdef char* buf_ptr = <char*>&buf_view[0]
+    cdef ifinfomsg ifi = dereference(<ifinfomsg*>buf_ptr)
+    return (ifi.ifi_family, ifi.ifi_type, ifi.ifi_index, ifi.ifi_flags, ifi.ifi_change)
+
+#cpdef ifinfomsg get_ifinfomsg(nlmsghdr h):
+#    cdef nlmsghdr* h_ptr = <nlmsghdr*>&h
+#    cdef ifinfomsg* info = <ifinfomsg*>NLMSG_DATA(h_ptr)
+#    return dereference(info)
+
+cpdef object test_return():
+    cdef rtattr tb[24];
+    memset(&tb, 0, sizeof(rtattr) * 24);
+    return tb
 
 cpdef rtattr get_rtattr(bytes buf):
     cdef const unsigned char[:] buf_view = buf
 #    print(f"JSE buf: {buf}, buf_view: {buf_view}")
     cdef char* buf_ptr = <char*>&buf_view[0]
-    cdef rtattr attr = dereference(<rtattr*>buf_ptr)
-#    memcpy(&attr, buf_ptr, sizeof(rtattr))
+#    cdef rtattr attr = dereference(<rtattr*>buf_ptr)
+    cdef rtattr attr;
+    memcpy(&attr, buf_ptr, sizeof(rtattr))
     return attr
 #    return (attr.rta_len, attr.rta_type)
 
 cpdef int rtm_payload(nlmsghdr nlh):
     return RTM_PAYLOAD(&nlh)
 
-cpdef int rta_align(int len):
-    return RTA_ALIGN(len)
+cpdef int rta_align(int leng):
+    return RTA_ALIGN(leng)
 
 cpdef int nlmsg_align(int leng):
     return NLMSG_ALIGN(leng)
@@ -53,7 +85,7 @@ cpdef bytes rta_data(bytes buf):
 #    return ret
 
 cpdef rtattr rta_next(rtattr rta, int leng):
-    return dereference(RTA_NEXT(&rta, leng)
+    return dereference(RTA_NEXT(&rta, leng))
 
 cpdef bytes prev_rta_next(bytes buf, list len_list):
     cdef const unsigned char[:] buf_view = buf

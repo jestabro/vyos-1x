@@ -36,7 +36,7 @@ if debug:
 else:
     logger.setLevel(logging.INFO)
 
-def parse_rtattr(rta: dict, max_enum: int, leng: int) -> dict: 
+def first_parse_rtattr(rta: dict, max_enum: int, leng: int) -> dict: 
     sn = SimpleNamespace()
     sn.len = leng
     d = {}
@@ -48,10 +48,32 @@ def parse_rtattr(rta: dict, max_enum: int, leng: int) -> dict:
 
     return d
 
+def parse_rtattr(buf: bytes, leng: int) -> dict:
+    d = {}
+    remaining = leng
+    while True:
+        attr = nl.get_rtattr(buf)
+        if not attr or not nl.rta_ok(attr, remaining):
+            print(f"JSE breaking: attr {attr} rta_ok {nl.rta_ok(attr, remaining)}")
+#            break
+
+        rta_type = attr['rta_type']
+        rta_len = attr['rta_len']
+        rta_align = nl.rta_align(rta_len)
+        d[rta_type] = buf[:rta_align]
+
+        remaining -= rta_align
+        buf = buf[rta_align:]
+
+    return d
+
 def nl_listen():
     #try
     s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
     s.bind((os.getpid(), nl.RTMGRP_LINK))
+
+    w = nl.test_return()
+    print(f"JSE test_return has type: {type(w)}")
 
     while True:
         data: bytes = s.recv(65535)
@@ -66,14 +88,26 @@ def nl_listen():
         print(f"nlmsg_hdrlen is {nlmsg_hdrlen}")
         print(f"status is {status}")
 
-        while status > nlmsg_hdrlen:
+        while status >= nlmsg_hdrlen:
             print(f"JSE what is nlh in Python ? Type: {type(nlh)}")
-            msg_type: int = nlh['nlmsg_type']
-            msg_len: int = nlh['nlmsg_len']
-            save_len: int = msg_len
+            nlmsg_type: int = nlh['nlmsg_type']
+            nlmsg_len: int = nlh['nlmsg_len']
+            save_len: int = nlmsg_len
+            print(f"nlmsg_type: {nlmsg_type}")
+            print(f"nlmsg_len: {nlmsg_len}")
 
+
+            data = data[16:]
+#            data = nl.Nlmsg_Data(data)
             # do things
-            print("JSE doing things")
+#            print(f"JSE doing things; data is {data.decode()}")
+
+            ifi_family, ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(data)
+            if 'ifi_family' in ifi:
+                print(f"ifi_family is {ifi['ifi_family']}")
+            else:
+                print("ifi_family not accessible")
+            print(f"JSE ifi_family: {ifi_family}, ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
             # get iffinfomsg
             # parse ifinfomsg as rtattr ?
             # record ifUp and ifRun
@@ -82,8 +116,20 @@ def nl_listen():
             # parse ifaddrmsg as rtattr ?
             # get addr
 
+            data = data[16:]
+#            data = nl.ifla_rta(data)
+#            print(f"after ifla_rta, data is {data.decode()}")
+
+#            res = parse_rtattr(data, nlmsg_len)
+#            for k, v in res.items():
+#                print(f"key: {k}, value: {v.decode()}")
+#            print(f"JSE resulting dict: {res}")
+
+            save_len = save_len - 32
+
             status -= nl.nlmsg_align(save_len)
-            data = data[nl.nlmsg_align(save_len):]
+            print(f"JSE save_len: {save_len} status: {status}")
+        #    data = data[nl.nlmsg_align(save_len):]
             if len(data) > nlmsg_hdrlen:
                 nlh = nl.get_header(data)
 
