@@ -98,12 +98,12 @@ def nl_listen():
             print(f"nlmsg_len: {nlmsg_len}")
 
 
-            data = data[16:]
+#            data = data[16:]
 #            data = nl.Nlmsg_Data(data)
             # do things
 #            print(f"JSE doing things; data is {data.decode()}")
 
-            ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(data)
+            ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(data[16:])
             print(f"JSE ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
 #            ifi_flags = nl.get_ifinfomsg_flags(data)
 #            print(f"JSE ifi_flags: {ifi_flags}")
@@ -115,7 +115,7 @@ def nl_listen():
             # parse ifaddrmsg as rtattr ?
             # get addr
 
-            data = data[16:]
+#            data = data[16:]
 #            data = nl.ifla_rta(data)
 #            print(f"after ifla_rta, data is {data.decode()}")
 
@@ -124,11 +124,11 @@ def nl_listen():
 #                print(f"key: {k}, value: {v.decode()}")
 #            print(f"JSE resulting dict: {res}")
 
-            save_len = save_len - 32
+#            save_len = save_len - 32
 
             status -= nl.nlmsg_align(save_len)
             print(f"JSE save_len: {save_len} status: {status}")
-        #    data = data[nl.nlmsg_align(save_len):]
+            data = data[nl.nlmsg_align(save_len):]
             if len(data) > nlmsg_hdrlen:
                 nlh = nl.get_header(data)
 
