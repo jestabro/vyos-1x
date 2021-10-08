@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+
+import os
+import socket
+import struct
+#import cy_netlink
+import vyos.cy_netlink as nl
+#from cy_netlink import RTMGRP_LINK
+
+# These constants map to constants in the Linux kernel. This is a crappy
+# way to get at them, but it'll do for now.
+#RTMGRP_LINK = 1
+
+#NLMSG_NOOP = 1
+#NLMSG_ERROR = 2
+
+#RTM_NEWLINK = 16
+#RTM_DELLINK = 17
+
+#IFLA_IFNAME = 3
+
+# Create the netlink socket and bind to RTMGRP_LINK,
+s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
+s.bind((os.getpid(), nl.RTMGRP_LINK))
+
+while True:
+    data = s.recv(65535)
+    print(f"JSE type(data): {type(data)}")
+#    msg_len, msg_type, flags, seq, pid = struct.unpack("=LHHLL", data[:16])
+#    msg_len, msg_type, flags, seq, pid = nl.get_header(data)
+    nlh = nl.get_header(data)
+    msg_type = nlh['nlmsg_type']
+    msg_len = nlh['nlmsg_len']
+
+    print(f"JSE msg_len: {msg_len}")
+    print(f"JSE msg_type: {msg_type}")
+
+    if msg_type == nl.NLMSG_NOOP:
+        print("no-op")
+        continue
+    elif msg_type == nl.NLMSG_ERROR:
+        print("error")
+        break
+
+    # We are currently monitoring only new or removed links
+    if msg_type != nl.RTM_NEWLINK and msg_type != nl.RTM_DELLINK:
+        continue
+
+    data = data[16:]
+
+    family, _, if_type, index, flags, change = struct.unpack("=BBHiII", data[:16])
+    print(f"JSE ifi_flags: {flags}")
+
+    remaining = msg_len - 32
+    data = data[16:]
+
+    what = nl.rtm_payload(nlh)
+    print(f"JSE rtm_payload: {what}")
+
+    while remaining:
+#        rta_len, rta_type = struct.unpack("=HH", data[:4])
+#        rta_len, rta_type = nl.get_rtattr(data[:4])
+        rtattr = nl.prev_get_rtattr(data[:4])
+        rta_len = rtattr['rta_len']
+        rta_type = rtattr['rta_type']
+        print(f"JSE rta_len: {rta_len}, rta_type: {rta_type}")
+
+        # This check comes from RTA_OK, and terminates a string of routing
+        # attributes.
+#        if rta_len < 4:
+#            break
+        if not nl.rta_ok(rtattr, remaining):
+            break
+
+#        rta_data = data[4:rta_len]
+#        rta_data = nl.rta_data(rtattr)
+        rta_data = nl.rta_data(data)
+
+#        increment = (rta_len + 4 - 1) & ~(4 - 1)
+        rta_increment = nl.rta_align(rta_len)
+#        print(f"JSE increment {increment} rta_increment {rta_increment}")
+#        data = data[increment:]
+#        remaining -= increment
+#        test_int = remaining
+#        print(f"JSE test_int: {test_int}")
+#        ret_data = nl.rta_next(data, [test_int])
+#        print(f"JSE test_int: {test_int}")
+#        step = nl.rta_next(data, remaining)
+#        print(f"JSE ret_data: {step._data}, ret_len: {step._position}")
+#        print(f"JSE ret_data: {ret_data}")
+
+        data = data[rta_increment:]
+        remaining -= rta_increment
+
+        test_int = remaining
+        ret_data = nl.prev_rta_next(data, [test_int])
+        print(f"JSE ret_data: {ret_data}")
+
+        # Hoorah, a link is up!
+        if rta_type == nl.IFLA_IFNAME:
+            if msg_type == nl.RTM_NEWLINK:
+                print(f"New link {rta_data.decode()}")
+            if msg_type == nl.RTM_DELLINK:
+                print(f"Removed link {rta_data.decode()}")
+

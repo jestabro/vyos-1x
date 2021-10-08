@@ -56,7 +56,7 @@ cpdef object test_return():
     memset(&tb, 0, sizeof(rtattr) * 24);
     return tb
 
-cpdef rtattr get_rtattr(bytes buf):
+cpdef rtattr prev_get_rtattr(bytes buf):
     cdef const unsigned char[:] buf_view = buf
 #    print(f"JSE buf: {buf}, buf_view: {buf_view}")
     cdef char* buf_ptr = <char*>&buf_view[0]
@@ -65,6 +65,14 @@ cpdef rtattr get_rtattr(bytes buf):
     memcpy(&attr, buf_ptr, sizeof(rtattr))
     return attr
 #    return (attr.rta_len, attr.rta_type)
+
+cpdef rtattr get_rtattr(bytes buf):
+    cdef const unsigned char[:] buf_view = buf
+#    print(f"JSE buf: {buf}, buf_view: {buf_view}")
+    cdef char* buf_ptr = <char*>&buf_view[0]
+    cdef rtattr attr = dereference(<rtattr*>buf_ptr)
+    return attr
+
 
 cpdef int rtm_payload(nlmsghdr nlh):
     return RTM_PAYLOAD(&nlh)
@@ -80,11 +88,11 @@ cpdef bint rta_ok(rtattr attr, int alen):
 
 ctypedef void* void_star
 
-cpdef bytes rta_data(bytes buf):
+cpdef bytes rta_data(bytes buf, int leng):
     cdef const unsigned char[:] buf_view = buf
     cdef char* buf_ptr = <char*>&buf_view[0]
     cdef bytes data = <bytes>(buf_ptr + RTA_LENGTH(0))
-    return data
+    return data[:leng]
 
 #cdef pre_rta_next(rtattr *attr, int *attr_len):
 #    cdef rtattr* ret = RTA_NEXT(attr, dereference(attr_len))

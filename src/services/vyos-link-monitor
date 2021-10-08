@@ -1,105 +1,141 @@
 #!/usr/bin/env python3
+#
+# Copyright (C) 2021 VyOS maintainers and contributors
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or later as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 
 import os
+import sys
+import time
 import socket
-import struct
-#import cy_netlink
+import logging
+from types import SimpleNamespace
+
 import vyos.cy_netlink as nl
-#from cy_netlink import RTMGRP_LINK
 
-# These constants map to constants in the Linux kernel. This is a crappy
-# way to get at them, but it'll do for now.
-#RTMGRP_LINK = 1
+debug = True
 
-#NLMSG_NOOP = 1
-#NLMSG_ERROR = 2
+logger = logging.getLogger(__name__)
+logs_handler = logging.StreamHandler()
+logger.addHandler(logs_handler)
 
-#RTM_NEWLINK = 16
-#RTM_DELLINK = 17
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
 
-#IFLA_IFNAME = 3
+def first_parse_rtattr(rta: dict, max_enum: int, leng: int) -> dict: 
+    sn = SimpleNamespace()
+    sn.len = leng
+    d = {}
 
-# Create the netlink socket and bind to RTMGRP_LINK,
-s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-s.bind((os.getpid(), nl.RTMGRP_LINK))
+    while nl.rta_ok(rta, sn.len):
+        if rta['rta_type'] <= max_enum:
+            d['rta_type'] = rta
+        rta = nl.rta_next(rta, sn.len)
 
-while True:
-    data = s.recv(65535)
-    print(f"JSE type(data): {type(data)}")
-#    msg_len, msg_type, flags, seq, pid = struct.unpack("=LHHLL", data[:16])
-#    msg_len, msg_type, flags, seq, pid = nl.get_header(data)
-    nlh = nl.get_header(data)
-    msg_type = nlh['nlmsg_type']
-    msg_len = nlh['nlmsg_len']
+    return d
 
-    print(f"JSE msg_len: {msg_len}")
-    print(f"JSE msg_type: {msg_type}")
-
-    if msg_type == nl.NLMSG_NOOP:
-        print("no-op")
-        continue
-    elif msg_type == nl.NLMSG_ERROR:
-        print("error")
-        break
-
-    # We are currently monitoring only new or removed links
-    if msg_type != nl.RTM_NEWLINK and msg_type != nl.RTM_DELLINK:
-        continue
-
-    data = data[16:]
-
-    family, _, if_type, index, flags, change = struct.unpack("=BBHiII", data[:16])
-    print(f"JSE ifi_flags: {flags}")
-
-    remaining = msg_len - 32
-    data = data[16:]
-
-    what = nl.rtm_payload(nlh)
-    print(f"JSE rtm_payload: {what}")
-
+def parse_rtattr(buf: bytes, leng: int) -> dict:
+    d = {}
+    remaining = leng
     while remaining:
-#        rta_len, rta_type = struct.unpack("=HH", data[:4])
-#        rta_len, rta_type = nl.get_rtattr(data[:4])
-        rtattr = nl.get_rtattr(data[:4])
-        rta_len = rtattr['rta_len']
-        rta_type = rtattr['rta_type']
-        print(f"JSE rta_len: {rta_len}, rta_type: {rta_type}")
-
-        # This check comes from RTA_OK, and terminates a string of routing
-        # attributes.
-#        if rta_len < 4:
-#            break
-        if not nl.rta_ok(rtattr, remaining):
+        attr = nl.get_rtattr(buf)
+        if not nl.rta_ok(attr, remaining):
+            print(f"JSE breaking: attr {attr} rta_ok {nl.rta_ok(attr, remaining)}")
             break
 
-#        rta_data = data[4:rta_len]
-#        rta_data = nl.rta_data(rtattr)
-        rta_data = nl.rta_data(data)
+        rta_type = attr['rta_type']
+        rta_len = attr['rta_len']
+        rta_align = nl.rta_align(rta_len)
+        d[rta_type] = buf[:rta_align]
 
-#        increment = (rta_len + 4 - 1) & ~(4 - 1)
-        rta_increment = nl.rta_align(rta_len)
-#        print(f"JSE increment {increment} rta_increment {rta_increment}")
-#        data = data[increment:]
-#        remaining -= increment
-#        test_int = remaining
-#        print(f"JSE test_int: {test_int}")
-#        ret_data = nl.rta_next(data, [test_int])
-#        print(f"JSE test_int: {test_int}")
-#        step = nl.rta_next(data, remaining)
-#        print(f"JSE ret_data: {step._data}, ret_len: {step._position}")
-#        print(f"JSE ret_data: {ret_data}")
+        remaining -= rta_align
+        buf = buf[rta_align:]
+#        leng = remaining
 
-        data = data[rta_increment:]
-        remaining -= rta_increment
+        print(f"JSE remaining: {remaining}")
 
-        test_int = remaining
-        ret_data = nl.prev_rta_next(data, [test_int])
-        print(f"JSE ret_data: {ret_data}")
+    return d
 
-        # Hoorah, a link is up!
-        if rta_type == nl.IFLA_IFNAME:
-            if msg_type == nl.RTM_NEWLINK:
-                print(f"New link {rta_data.decode()}")
-            if msg_type == nl.RTM_DELLINK:
-                print(f"Removed link {rta_data.decode()}")
+def nl_listen():
+    #try
+    s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
+    s.bind((os.getpid(), nl.RTMGRP_LINK))
 
+    w = nl.test_return()
+    print(f"JSE test_return has type: {type(w)}")
+
+    while True:
+        data: bytes = s.recv(65535)
+        # check length ?
+        status: int = len(data)
+
+        nlh = nl.get_header(data)
+        siz = nl.get_sizeof_header(nlh)
+#        nlmsg_hdrlen = nl.get_nlmsg_hdrlen()
+        nlmsg_hdrlen = nl.NLMSG_HDRLEN
+        print(f"sizeof nlmsg header is {siz}")
+        print(f"nlmsg_hdrlen is {nlmsg_hdrlen}")
+        print(f"status is {status}")
+
+        while status >= nlmsg_hdrlen:
+            print(f"JSE what is nlh in Python ? Type: {type(nlh)}")
+            nlmsg_type: int = nlh['nlmsg_type']
+            nlmsg_len: int = nlh['nlmsg_len']
+            save_len: int = nlmsg_len
+            print(f"nlmsg_type: {nlmsg_type}")
+            print(f"nlmsg_len: {nlmsg_len}")
+
+
+#            data = data[16:]
+#            data = nl.Nlmsg_Data(data)
+            # do things
+#            print(f"JSE doing things; data is {data.decode()}")
+
+            ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(data[16:])
+            print(f"JSE ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
+#            ifi_flags = nl.get_ifinfomsg_flags(data)
+#            print(f"JSE ifi_flags: {ifi_flags}")
+            # get iffinfomsg
+            # parse ifinfomsg as rtattr ?
+            # record ifUp and ifRun
+            #
+            # get ifaddrmsg
+            # parse ifaddrmsg as rtattr ?
+            # get addr
+
+#            data = data[16:]
+#            data = nl.ifla_rta(data)
+#            print(f"after ifla_rta, data is {data.decode()}")
+
+            res = parse_rtattr(data, nlmsg_len)
+            for k, v in res.items():
+                print(f"key: {k}, value: {v.decode('utf-8', 'ignore')}")
+#            print(f"JSE resulting dict: {res}")
+
+#            save_len = save_len - 32
+
+            status -= nl.nlmsg_align(save_len)
+            print(f"JSE save_len: {save_len} status: {status}")
+            data = data[nl.nlmsg_align(save_len):]
+            if len(data) > nlmsg_hdrlen:
+                nlh = nl.get_header(data)
+
+def main():
+    nl_listen()
+
+if __name__ == '__main__':
+    main()
