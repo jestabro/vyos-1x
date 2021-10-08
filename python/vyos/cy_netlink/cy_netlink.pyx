@@ -34,11 +34,17 @@ cpdef bytes ifa_rta(bytes buf):
 cpdef int get_sizeof_header(nlmsghdr h):
     return sizeof(h)
 
-cpdef (unsigned char, unsigned short, int, unsigned int, unsigned int) get_ifinfomsg(bytes buf):
+cpdef (unsigned short, int, unsigned int, unsigned int) get_ifinfomsg(bytes buf):
     cdef const unsigned char[:] buf_view = buf
     cdef char* buf_ptr = <char*>&buf_view[0]
     cdef ifinfomsg ifi = dereference(<ifinfomsg*>buf_ptr)
-    return (ifi.ifi_family, ifi.ifi_type, ifi.ifi_index, ifi.ifi_flags, ifi.ifi_change)
+    return (ifi.ifi_type, ifi.ifi_index, ifi.ifi_flags, ifi.ifi_change)
+
+cpdef unsigned int get_ifinfomsg_flags(bytes buf):
+    cdef const unsigned char[:] buf_view = buf
+    cdef char* buf_ptr = <char*>&buf_view[0]
+    cdef ifinfomsg ifi = dereference(<ifinfomsg*>buf_ptr)
+    return ifi.ifi_flags
 
 #cpdef ifinfomsg get_ifinfomsg(nlmsghdr h):
 #    cdef nlmsghdr* h_ptr = <nlmsghdr*>&h
@@ -84,8 +90,8 @@ cpdef bytes rta_data(bytes buf):
 #    cdef rtattr* ret = RTA_NEXT(attr, dereference(attr_len))
 #    return ret
 
-cpdef rtattr rta_next(rtattr rta, int leng):
-    return dereference(RTA_NEXT(&rta, leng))
+cpdef rtattr rta_next(rtattr rta, object obj):
+    return dereference(RTA_NEXT(&rta, obj.len))
 
 cpdef bytes prev_rta_next(bytes buf, list len_list):
     cdef const unsigned char[:] buf_view = buf

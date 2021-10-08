@@ -49,6 +49,7 @@ while True:
     data = data[16:]
 
     family, _, if_type, index, flags, change = struct.unpack("=BBHiII", data[:16])
+    print(f"JSE ifi_flags: {flags}")
 
     remaining = msg_len - 32
     data = data[16:]

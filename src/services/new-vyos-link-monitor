@@ -55,7 +55,7 @@ def parse_rtattr(buf: bytes, leng: int) -> dict:
         attr = nl.get_rtattr(buf)
         if not attr or not nl.rta_ok(attr, remaining):
             print(f"JSE breaking: attr {attr} rta_ok {nl.rta_ok(attr, remaining)}")
-#            break
+            break
 
         rta_type = attr['rta_type']
         rta_len = attr['rta_len']
@@ -64,6 +64,7 @@ def parse_rtattr(buf: bytes, leng: int) -> dict:
 
         remaining -= rta_align
         buf = buf[rta_align:]
+        leng = remaining
 
     return d
 
@@ -102,12 +103,10 @@ def nl_listen():
             # do things
 #            print(f"JSE doing things; data is {data.decode()}")
 
-            ifi_family, ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(data)
-            if 'ifi_family' in ifi:
-                print(f"ifi_family is {ifi['ifi_family']}")
-            else:
-                print("ifi_family not accessible")
-            print(f"JSE ifi_family: {ifi_family}, ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
+            ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(data)
+            print(f"JSE ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
+#            ifi_flags = nl.get_ifinfomsg_flags(data)
+#            print(f"JSE ifi_flags: {ifi_flags}")
             # get iffinfomsg
             # parse ifinfomsg as rtattr ?
             # record ifUp and ifRun

@@ -26,13 +26,13 @@ cdef extern from "linux/rtnetlink.h":
         RTM_NEWLINK
         RTM_DELLINK
     struct ifinfomsg:
-        pass
+#        pass
 #        unsigned char   ifi_family
 #        unsigned char   __ifi_pad
-#        unsigned short  ifi_type
-#        int             ifi_index
-#        unsigned int    ifi_flags
-#        unsigned int    ifi_change
+        unsigned short  ifi_type
+        int             ifi_index
+        unsigned int    ifi_flags
+        unsigned int    ifi_change
     struct rtattr:
         unsigned short  rta_len
         unsigned short  rta_type
@@ -51,7 +51,9 @@ cdef extern from "linux/if_link.h":
 cpdef nlmsghdr get_header(bytes)
 
 # ifinfomsg
-cpdef (unsigned char, unsigned short, int, unsigned int, unsigned int) get_ifinfomsg(bytes)
+cpdef (unsigned short, int, unsigned int, unsigned int) get_ifinfomsg(bytes)
+
+cpdef unsigned int get_ifinfomsg_flags(bytes)
 
 #cpdef (unsigned short, unsigned short) get_rtattr(bytes)
 cpdef rtattr get_rtattr(bytes)
