@@ -14,20 +14,18 @@ cpdef nlmsghdr get_header(bytes buf):
 #    return (hdr.nlmsg_len, hdr.nlmsg_type, hdr.nlmsg_flags, hdr.nlmsg_seq, hdr.nlmsg_pid)
 
 cpdef bytes Nlmsg_Data(bytes buf):
-#    cdef const unsigned char[:] buf_view = buf
-    cdef const unsigned char[:] buf_view = buf
-    cdef unsigned char[:] shift_view
-    shift_view[:] = buf_view[NLMSG_HDRLEN:]
-    return <bytes>shift_view
-#    cdef char* buf_ptr = <char*>&buf_view[0]
-#    buf_ptr = <char*>NLMSG_DATA(<nlmsghdr*>buf_ptr)
-#    return <bytes>buf_ptr
+    shift_buf = buf[NLMSG_HDRLEN:]
+    return <bytes>shift_buf
 
-cpdef bytes ifla_rta(bytes buf):
-    cdef const unsigned char[:] buf_view = buf
-    cdef char* buf_ptr = <char*>&buf_view[0]
-    cdef char* ret_ptr = <char*>IFLA_RTA(<ifinfomsg*>buf_ptr)
-    return <bytes>ret_ptr
+cpdef bytes Ifla_Rta(bytes buf):
+    shift = NLMSG_ALIGN(sizeof(ifinfomsg))
+    shift_buf = buf[shift:]
+    return shift_buf
+
+cpdef bytes Ifa_Rta(bytes buf):
+    shift = NLMSG_ALIGN(sizeof(ifaddrmsg))
+    shift_buf = buf[shift:]
+    return shift_buf
 
 cpdef bytes ifa_rta(bytes buf):
     cdef const unsigned char[:] buf_view = buf
@@ -89,8 +87,11 @@ cpdef int rta_align(int leng):
 cpdef int nlmsg_align(int leng):
     return NLMSG_ALIGN(leng)
 
-cpdef bint rta_ok(rtattr attr, int alen):
+cpdef bint Rta_Ok(rtattr attr, int alen):
     return RTA_OK(&attr, alen)
+
+cpdef int Rta_Length(int leng):
+    return RTA_LENGTH(leng)
 
 ctypedef void* void_star
 
@@ -135,3 +136,7 @@ print(f"RTM_NEWLINK: {RTM_NEWLINK}")
 print(f"RTM_DELLINK: {RTM_DELLINK}")
 print(f"IFLA_IFNAME: {IFLA_IFNAME}")
 print(f"NLMSG_HDRLEN: {NLMSG_HDRLEN}")
+print(f"sizeof ifinfomsg: {sizeof(ifinfomsg)}")
+print(f"sizeof ifaddrmsg: {sizeof(ifaddrmsg)}")
+print(f"IFLA_MAX: {IFLA_MAX}")
+print(f"IFA_MAX: {IFA_MAX}")

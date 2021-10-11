@@ -3,6 +3,9 @@ cdef extern from "linux/if.h":
         IFF_UP
         IFF_RUNNING
 cdef extern from "linux/if_addr.h":
+    cpdef enum:
+        IFA_LOCAL
+        IFA_MAX
     struct ifaddrmsg:
         unsigned char   ifa_family
         unsigned char   ifa_prefixlen
@@ -10,6 +13,11 @@ cdef extern from "linux/if_addr.h":
         unsigned char   ifa_scope
         unsigned int    ifa_index
     rtattr* IFA_RTA(ifaddrmsg*)
+cdef extern from "linux/if_link.h":
+    cpdef enum:
+        IFLA_IFNAME
+        IFLA_MAX
+    cdef rtattr* IFLA_RTA(ifinfomsg*)
 cdef extern from "linux/netlink.h":
     cpdef enum:
         NLMSG_NOOP
@@ -27,6 +35,8 @@ cdef extern from "linux/netlink.h":
 cdef extern from "linux/rtnetlink.h":
     cpdef enum:
         RTMGRP_LINK
+        RTMGRP_IPV4_IFADDR
+        RTMGRP_IPV4_ROUTE
         RTM_NEWLINK
         RTM_DELLINK
         RTM_NEWROUTE
@@ -51,10 +61,6 @@ cdef extern from "linux/rtnetlink.h":
     cdef int RTM_PAYLOAD(nlmsghdr*)
     rtattr* RTA_NEXT(rtattr*, int)
 #    cdef void* RTA_DATA(rtattr)
-cdef extern from "linux/if_link.h":
-    cpdef enum:
-        IFLA_IFNAME
-    cdef rtattr* IFLA_RTA(ifinfomsg*)
 
 #cpdef (unsigned int, unsigned short, unsigned short, unsigned int, unsigned int) get_header(bytes)
 #cpdef nlmsghdr get_header(bytes)

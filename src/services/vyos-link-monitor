@@ -17,13 +17,11 @@
 #
 
 import os
-import sys
-import time
 import socket
 import logging
-from types import SimpleNamespace
 
 import vyos.cy_netlink as nl
+#import nl.nl_event
 
 debug = True
 
@@ -36,22 +34,33 @@ if debug:
 else:
     logger.setLevel(logging.INFO)
 
-def parse_rtattr(buf: bytes, leng: int) -> dict:
+def parse_rtattr(buf: bytes, max_attr: int) -> dict:
     attrs = {}
-    remaining = leng
+    remaining = len(buf)
     while remaining:
         attr = nl.get_rtattr(buf)
-        if not nl.rta_ok(attr, remaining):
+        if not nl.Rta_Ok(attr, remaining):
             break
 
         rta_type = attr['rta_type']
         rta_len = attr['rta_len']
-        rta_align = nl.rta_align(rta_len)
+        # RTA_LENGTH(0) is the sizeof the struct
+        rta_length = nl.Rta_Length(0)
 
         print(f"JSE rta_type {rta_type}")
-        attrs[rta_type] = buf[:rta_align]
-        print(f"JSE attrs: {attrs}")
 
+        if rta_type <= max_attr:
+#            attrs[rta_type] = buf[:rta_align]
+            attrs[rta_type] = buf[rta_length:rta_len]
+
+#        print(f"JSE attrs: {attrs}")
+
+        # Here we would prefer to use a suitably wrapped RTA_NEXT, however,
+        # the macro updates length in place, requiring a pass-by-reference;
+        # the obvious workaround of returning a tuple is not supported by
+        # Cython for tuples containing a python _object_ (bytes). So, we do
+        # it explicitly instead of contriving a pass-by-reference.
+        rta_align = nl.rta_align(rta_len)
         remaining -= rta_align
         buf = buf[rta_align:]
 
@@ -62,7 +71,7 @@ def parse_rtattr(buf: bytes, leng: int) -> dict:
 def nl_receive():
     try:
         s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-        s.bind((os.getpid(), nl.RTMGRP_LINK))
+        s.bind((os.getpid(), nl.RTMGRP_LINK | nl.RTMGRP_IPV4_IFADDR | nl.RTMGRP_IPV4_ROUTE))
     except OSError as e:
         logger.critical(f"OSError {e}")
 
@@ -80,26 +89,47 @@ def nl_receive():
             if nlmsg_type in (nl.RTM_NEWROUTE, nl.RTM_DELROUTE):
                 logger.info("Change to routing table")
             else:
-                tmp_data = nl.Nlmsg_Data(data)
-                print(f"JSE tmp_data: {tmp_data}")
-                print(f"JSE data[16:]: {data[16:]}")
-                ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(data[16:])
+                ifinfo_data = nl.Nlmsg_Data(data)
+
+                ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(ifinfo_data)
                 logger.debug(f"ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
 
-#                tmp_data = nl.ifla_rta(tmp_data)
+                rta_data = nl.Ifla_Rta(ifinfo_data)
 
-                attr_dict = parse_rtattr(data[32:], nlmsg_len - 32)
+#                attr_dict = parse_rtattr(data[32:], nlmsg_len - 32)
+                attr_dict = parse_rtattr(rta_data, nl.IFLA_MAX)
 
                 print(f"JSE nl.IFLA_IFNAME: {nl.IFLA_IFNAME}; attr_dict keys: {list(attr_dict)}")
 
                 if nl.IFLA_IFNAME in list(attr_dict):
                     ifname = attr_dict[nl.IFLA_IFNAME].decode()
                     print(f"JSE ifname: {ifname}")
+                else:
+                    ifname = 'none'
 
-                step = nl.nlmsg_align(save_len)
-                status -= step
+                ifUp = bool(ifi_flags & nl.IFF_UP)
+                ifRunning = bool(ifi_flags & nl.IFF_RUNNING)
 
-                data = data[step:]
+                print(f"JSE ifname: {ifname} ifUp: {ifUp} ifRunning: {ifRunning}")
+
+                ifaddr_data = nl.Nlmsg_Data(data)
+
+                rta_data = nl.Ifa_Rta(ifaddr_data)
+
+                attr_dict = parse_rtattr(rta_data, nl.IFA_MAX)
+
+                if nl.IFA_LOCAL in list(attr_dict):
+                    ifaddress = socket.inet_ntop(socket.AF_INET, attr_dict[nl.IFA_LOCAL])
+                    print(f"JSE ifaddress: {ifaddress}")
+                else:
+                    print("JSE no address info")
+
+                print(f"JSE nl.IFA_LOCAL: {nl.IFA_LOCAL}; attr_dict keys: {list(attr_dict)}")
+
+            step = nl.nlmsg_align(save_len)
+            status -= step
+
+            data = data[step:]
 #                if len(data) > nlmsg_hdrlen:
 #                    nlh = nl.get_header(data)
 

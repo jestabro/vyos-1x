@@ -69,7 +69,7 @@ while True:
         # attributes.
 #        if rta_len < 4:
 #            break
-        if not nl.rta_ok(rtattr, remaining):
+        if not nl.Rta_Ok(rtattr, remaining):
             break
 
 #        rta_data = data[4:rta_len]
