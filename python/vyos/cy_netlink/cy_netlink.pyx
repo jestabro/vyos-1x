@@ -14,10 +14,14 @@ cpdef nlmsghdr get_header(bytes buf):
 #    return (hdr.nlmsg_len, hdr.nlmsg_type, hdr.nlmsg_flags, hdr.nlmsg_seq, hdr.nlmsg_pid)
 
 cpdef bytes Nlmsg_Data(bytes buf):
+#    cdef const unsigned char[:] buf_view = buf
     cdef const unsigned char[:] buf_view = buf
-    cdef char* buf_ptr = <char*>&buf_view[0]
-    buf_ptr = <char*>NLMSG_DATA(<nlmsghdr*>buf_ptr)
-    return <bytes>buf_ptr
+    cdef unsigned char[:] shift_view
+    shift_view[:] = buf_view[NLMSG_HDRLEN:]
+    return <bytes>shift_view
+#    cdef char* buf_ptr = <char*>&buf_view[0]
+#    buf_ptr = <char*>NLMSG_DATA(<nlmsghdr*>buf_ptr)
+#    return <bytes>buf_ptr
 
 cpdef bytes ifla_rta(bytes buf):
     cdef const unsigned char[:] buf_view = buf
@@ -34,6 +38,8 @@ cpdef bytes ifa_rta(bytes buf):
 cpdef int get_sizeof_header(nlmsghdr h):
     return sizeof(h)
 
+# N. B. members must be accessed explicitly, due to issue with padding
+# member (cf. comments in netlink.pxd).
 cpdef (unsigned short, int, unsigned int, unsigned int) get_ifinfomsg(bytes buf):
     cdef const unsigned char[:] buf_view = buf
     cdef char* buf_ptr = <char*>&buf_view[0]

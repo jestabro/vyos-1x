@@ -1,3 +1,7 @@
+cdef extern from "linux/if.h":
+    cpdef enum:
+        IFF_UP
+        IFF_RUNNING
 cdef extern from "linux/if_addr.h":
     struct ifaddrmsg:
         unsigned char   ifa_family
@@ -25,8 +29,13 @@ cdef extern from "linux/rtnetlink.h":
         RTMGRP_LINK
         RTM_NEWLINK
         RTM_DELLINK
+        RTM_NEWROUTE
+        RTM_DELROUTE
     struct ifinfomsg:
-#        pass
+# N.B. Cython has trouble with the padding member (because of mangling of
+# double underscore) before version 3.0.a3 (commit 25b7d7e4), hence only
+# members after the padding are accessible ; stable 3.0 is not released as
+# of this writing.
 #        unsigned char   ifi_family
 #        unsigned char   __ifi_pad
         unsigned short  ifi_type
@@ -48,7 +57,7 @@ cdef extern from "linux/if_link.h":
     cdef rtattr* IFLA_RTA(ifinfomsg*)
 
 #cpdef (unsigned int, unsigned short, unsigned short, unsigned int, unsigned int) get_header(bytes)
-cpdef nlmsghdr get_header(bytes)
+#cpdef nlmsghdr get_header(bytes)
 
 # ifinfomsg
 cpdef (unsigned short, int, unsigned int, unsigned int) get_ifinfomsg(bytes)
