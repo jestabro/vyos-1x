@@ -19,9 +19,11 @@
 import os
 import socket
 import logging
+from queue import Queue
+from threading import Thread
 
 import vyos.cy_netlink as nl
-#import nl.nl_event
+from vyos.nl_event import NL_Event, NL_Message, event_decorator
 
 debug = True
 
@@ -68,10 +70,10 @@ def parse_rtattr(buf: bytes, max_attr: int) -> dict:
 
     return attrs
 
-def nl_receive():
+def nl_receive(out_q: Queue):
     try:
         s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-        s.bind((os.getpid(), nl.RTMGRP_LINK | nl.RTMGRP_IPV4_IFADDR | nl.RTMGRP_IPV4_ROUTE))
+        s.bind((os.getpid(), nl.RTMGRP_LINK | nl.RTMGRP_IPV4_IFADDR))
     except OSError as e:
         logger.critical(f"OSError {e}")
 
@@ -86,55 +88,78 @@ def nl_receive():
             nlmsg_len: int = nlh['nlmsg_len']
             save_len: int = nlmsg_len
 
-            if nlmsg_type in (nl.RTM_NEWROUTE, nl.RTM_DELROUTE):
-                logger.info("Change to routing table")
-            else:
-                ifinfo_data = nl.Nlmsg_Data(data)
+            ifinfo_data = nl.Nlmsg_Data(data)
 
-                ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(ifinfo_data)
-                logger.debug(f"ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
+            ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(ifinfo_data)
+            logger.debug(f"ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
 
-                rta_data = nl.Ifla_Rta(ifinfo_data)
+            rta_data = nl.Ifla_Rta(ifinfo_data)
 
 #                attr_dict = parse_rtattr(data[32:], nlmsg_len - 32)
-                attr_dict = parse_rtattr(rta_data, nl.IFLA_MAX)
+            attr_dict = parse_rtattr(rta_data, nl.IFLA_MAX)
 
-                print(f"JSE nl.IFLA_IFNAME: {nl.IFLA_IFNAME}; attr_dict keys: {list(attr_dict)}")
+            print(f"JSE nl.IFLA_IFNAME: {nl.IFLA_IFNAME}; attr_dict keys: {list(attr_dict)}")
 
-                if nl.IFLA_IFNAME in list(attr_dict):
-                    ifname = attr_dict[nl.IFLA_IFNAME].decode()
-                    print(f"JSE ifname: {ifname}")
-                else:
-                    ifname = 'none'
+            if nl.IFLA_IFNAME in list(attr_dict):
+                ifName = attr_dict[nl.IFLA_IFNAME].decode().rstrip('\0')
+                print(f"JSE ifname: {ifName}")
+            else:
+                ifName = ''
 
-                ifUp = bool(ifi_flags & nl.IFF_UP)
-                ifRunning = bool(ifi_flags & nl.IFF_RUNNING)
+            ifUp = bool(ifi_flags & nl.IFF_UP)
+            ifRunning = bool(ifi_flags & nl.IFF_RUNNING)
 
-                print(f"JSE ifname: {ifname} ifUp: {ifUp} ifRunning: {ifRunning}")
+            print(f"JSE ifname: {ifName} ifUp: {ifUp} ifRunning: {ifRunning}")
 
-                ifaddr_data = nl.Nlmsg_Data(data)
+            ifaddr_data = nl.Nlmsg_Data(data)
 
-                rta_data = nl.Ifa_Rta(ifaddr_data)
+            rta_data = nl.Ifa_Rta(ifaddr_data)
 
-                attr_dict = parse_rtattr(rta_data, nl.IFA_MAX)
+            attr_dict = parse_rtattr(rta_data, nl.IFA_MAX)
 
-                if nl.IFA_LOCAL in list(attr_dict):
-                    ifaddress = socket.inet_ntop(socket.AF_INET, attr_dict[nl.IFA_LOCAL])
-                    print(f"JSE ifaddress: {ifaddress}")
-                else:
-                    print("JSE no address info")
+            if nl.IFA_LOCAL in list(attr_dict):
+                ifAddress = socket.inet_ntop(socket.AF_INET, attr_dict[nl.IFA_LOCAL])
+                print(f"JSE ifaddress: {ifAddress}")
+            else:
+                ifAddress = ''
+                print("JSE no address info")
 
-                print(f"JSE nl.IFA_LOCAL: {nl.IFA_LOCAL}; attr_dict keys: {list(attr_dict)}")
+            print(f"JSE nl.IFA_LOCAL: {nl.IFA_LOCAL}; attr_dict keys: {list(attr_dict)}")
+
+            if nlmsg_type == nl.RTM_NEWLINK:
+                msg = NL_Message(event=NL_Event.NEWLINK, ifname=ifName,
+                                 ifaddress=ifAddress, ifup=ifUp,
+                                 ifrunning=ifRunning)
+                msg.text = "newlink event"
+            elif nlmsg_type == nl.RTM_DELLINK:
+                msg = NL_Message(event=NL_Event.DELLINK, ifname=ifName,
+                                 ifaddress=ifAddress, ifup=ifUp,
+                                 ifrunning=ifRunning)
+                msg.text = "dellink event"
+
+            out_q.put(msg)
 
             step = nl.nlmsg_align(save_len)
             status -= step
 
             data = data[step:]
-#                if len(data) > nlmsg_hdrlen:
-#                    nlh = nl.get_header(data)
+
+def nl_action(in_q: Queue):
+    @event_decorator(NL_Event.NEWLINK)
+    def on_newlink():
+        print("JSE callback on newlink")
+
+    while True:
+        msg = in_q.get()
+        logger.debug(f"JSE msg is {vars(msg)}")
+        msg.invoke_actions()
 
 def main():
-    nl_receive()
+    q = Queue()
+    t1 = Thread(target=nl_action, args=(q, ))
+    t2 = Thread(target=nl_receive, args=(q, ))
+    t1.start()
+    t2.start()
 
 if __name__ == '__main__':
     main()

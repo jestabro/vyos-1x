@@ -9,19 +9,21 @@ class NL_Event(IntEnum):
 
 class NL_Message():
     event_actions: dict = {NL_Event.NOEVENT: []}
-    def __init__(self):
-        self._event: NL_Event = NL_Event.NOEVENT
-        self._ifname: str = ''
-        self._ifaddress: str = ''
-        self._ifup: bool = False
-        self._ifrunning: bool = False
+    def __init__(self, event=NL_Event.NOEVENT, ifname='', ifaddress='',
+                 ifup=False, ifrunning=False):
+        self.event: NL_Event = event
+        self.ifname: str = ifname
+        self.ifaddress: str = ifaddress
+        self.ifup: bool = ifup
+        self.ifrunning: bool = ifrunning
+        self.text: str = ''
 
     @classmethod
     def add_action(cls, event: NL_Event, func: Callable):
-        cls.event_actions[event].setdefault(event, []).append(func)
+        cls.event_actions.setdefault(event, []).append(func)
 
     def invoke_actions(self):
-        for callback in self.event_actions[self._event]:
+        for callback in self.event_actions[self.event]:
             callback(self)
 
 def event_decorator(event: NL_Event):
