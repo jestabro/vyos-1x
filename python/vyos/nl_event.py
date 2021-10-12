@@ -23,7 +23,8 @@ class NL_Message():
         cls.event_actions.setdefault(event, []).append(func)
 
     def invoke_actions(self):
-        for callback in self.event_actions[self.event]:
+        action_list = self.event_actions.get(self.event, [])
+        for callback in action_list:
             callback()
 
 def event_decorator(event: NL_Event):
