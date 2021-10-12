@@ -24,13 +24,13 @@ class NL_Message():
 
     def invoke_actions(self):
         for callback in self.event_actions[self.event]:
-            callback(self)
+            callback()
 
 def event_decorator(event: NL_Event):
     def inner(f):
-        NL_Message.add_action(event, f)
         def wrapped(*args, **kwargs):
             res = f(*args, **kwargs)
             return res
+        NL_Message.add_action(event, f)
         return wrapped
     return inner

@@ -131,13 +131,13 @@ def nl_receive(out_q: Queue):
                                  ifaddress=ifAddress, ifup=ifUp,
                                  ifrunning=ifRunning)
                 msg.text = "newlink event"
+                out_q.put(msg)
             elif nlmsg_type == nl.RTM_DELLINK:
                 msg = NL_Message(event=NL_Event.DELLINK, ifname=ifName,
                                  ifaddress=ifAddress, ifup=ifUp,
                                  ifrunning=ifRunning)
                 msg.text = "dellink event"
-
-            out_q.put(msg)
+                out_q.put(msg)
 
             step = nl.nlmsg_align(save_len)
             status -= step
