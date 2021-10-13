@@ -1,9 +1,7 @@
 
-#from cy_netlink cimport RTMGRP_LINK, RTM_NEWLINK, RTM_DELLINK, nlmsghdr
 from libc.string cimport memcpy, memset
 from cython.operator cimport dereference
-#from cpython.ref cimport PyObject
-cimport cy_netlink
+cimport netlink
 
 cpdef nlmsghdr get_header(bytes buf):
     cdef const unsigned char[:] buf_view = buf

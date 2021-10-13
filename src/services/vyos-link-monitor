@@ -23,7 +23,7 @@ import argparse
 from queue import Queue
 from threading import Thread
 
-import vyos.cy_netlink as nl
+import vyos.netlink as nl
 from vyos.nl_event import NL_Event, NL_Message, action_on_event
 
 #debug = True
