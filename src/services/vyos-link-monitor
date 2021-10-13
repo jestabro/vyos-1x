@@ -19,22 +19,23 @@
 import os
 import socket
 import logging
+import argparse
 from queue import Queue
 from threading import Thread
 
 import vyos.cy_netlink as nl
-from vyos.nl_event import NL_Event, NL_Message, event_decorator
+from vyos.nl_event import NL_Event, NL_Message, action_on_event
 
-debug = True
+#debug = True
 
 logger = logging.getLogger(__name__)
 logs_handler = logging.StreamHandler()
 logger.addHandler(logs_handler)
 
-if debug:
-    logger.setLevel(logging.DEBUG)
-else:
-    logger.setLevel(logging.INFO)
+#if debug:
+#    logger.setLevel(logging.DEBUG)
+#else:
+#    logger.setLevel(logging.INFO)
 
 def parse_rtattr(buf: bytes, max_attr: int) -> dict:
     attrs = {}
@@ -49,13 +50,8 @@ def parse_rtattr(buf: bytes, max_attr: int) -> dict:
         # RTA_LENGTH(0) is the sizeof the struct
         rta_length = nl.Rta_Length(0)
 
-        print(f"JSE rta_type {rta_type}")
-
         if rta_type <= max_attr:
-#            attrs[rta_type] = buf[:rta_align]
             attrs[rta_type] = buf[rta_length:rta_len]
-
-#        print(f"JSE attrs: {attrs}")
 
         # Here we would prefer to use a suitably wrapped RTA_NEXT, however,
         # the macro updates length in place, requiring a pass-by-reference;
@@ -66,9 +62,13 @@ def parse_rtattr(buf: bytes, max_attr: int) -> dict:
         remaining -= rta_align
         buf = buf[rta_align:]
 
-        logger.debug(f"remaining: {remaining}")
-
     return attrs
+
+def update_status(s: int, d: bytes, leng: int) -> tuple[int, bytes]:
+    step = nl.nlmsg_align(leng)
+    s -= step
+    d = d[step:]
+    return s, d
 
 def nl_receive(out_q: Queue):
     try:
@@ -86,75 +86,95 @@ def nl_receive(out_q: Queue):
             nlh: nl.nlmsghdr = nl.get_header(data)
             nlmsg_type: int = nlh['nlmsg_type']
             nlmsg_len: int = nlh['nlmsg_len']
-            save_len: int = nlmsg_len
+
+            if nlmsg_type == nl.NLMSG_NOOP:
+                logger.info("netlink message type is NLMSG_NOOP")
+                status, data = update_status(status, data, nlmsg_len)
+                continue
+            if nlmsg_type == nl.NLMSG_ERROR:
+                logger.critical("netlink message type is NLMSG_ERROR")
+                break
 
             ifinfo_data = nl.Nlmsg_Data(data)
-
             ifi_type, ifi_index, ifi_flags, ifi_change = nl.get_ifinfomsg(ifinfo_data)
+
             logger.debug(f"ifi_type: {ifi_type}, ifi_index: {ifi_index}, ifi_flags: {ifi_flags}, ifi_change: {ifi_change}")
 
             rta_data = nl.Ifla_Rta(ifinfo_data)
-
-#                attr_dict = parse_rtattr(data[32:], nlmsg_len - 32)
             attr_dict = parse_rtattr(rta_data, nl.IFLA_MAX)
-
-            print(f"JSE nl.IFLA_IFNAME: {nl.IFLA_IFNAME}; attr_dict keys: {list(attr_dict)}")
 
             if nl.IFLA_IFNAME in list(attr_dict):
                 ifName = attr_dict[nl.IFLA_IFNAME].decode().rstrip('\0')
-                print(f"JSE ifname: {ifName}")
             else:
                 ifName = ''
 
             ifUp = bool(ifi_flags & nl.IFF_UP)
             ifRunning = bool(ifi_flags & nl.IFF_RUNNING)
 
-            print(f"JSE ifname: {ifName} ifUp: {ifUp} ifRunning: {ifRunning}")
+            logger.debug(f"ifname: {ifName} ifup: {ifUp} ifrunning: {ifRunning}")
 
             ifaddr_data = nl.Nlmsg_Data(data)
-
             rta_data = nl.Ifa_Rta(ifaddr_data)
-
             attr_dict = parse_rtattr(rta_data, nl.IFA_MAX)
 
             if nl.IFA_LOCAL in list(attr_dict):
                 ifAddress = socket.inet_ntop(socket.AF_INET, attr_dict[nl.IFA_LOCAL])
-                print(f"JSE ifaddress: {ifAddress}")
             else:
                 ifAddress = ''
-                print("JSE no address info")
 
-            print(f"JSE nl.IFA_LOCAL: {nl.IFA_LOCAL}; attr_dict keys: {list(attr_dict)}")
+            logger.debug(f"ifaddress: {ifAddress}")
 
             if nlmsg_type == nl.RTM_NEWLINK:
                 msg = NL_Message(event=NL_Event.NEWLINK, ifname=ifName,
                                  ifaddress=ifAddress, ifup=ifUp,
-                                 ifrunning=ifRunning)
+                                 ifrunning=ifRunning, change_mask=ifi_change)
                 msg.text = "newlink event"
                 out_q.put(msg)
             elif nlmsg_type == nl.RTM_DELLINK:
                 msg = NL_Message(event=NL_Event.DELLINK, ifname=ifName,
                                  ifaddress=ifAddress, ifup=ifUp,
-                                 ifrunning=ifRunning)
+                                 ifrunning=ifRunning, change_mask=ifi_change)
                 msg.text = "dellink event"
                 out_q.put(msg)
+            elif nlmsg_type == nl.RTM_NEWADDR:
+                msg = NL_Message(event=NL_Event.NEWADDR, ifname=ifName,
+                                 ifaddress=ifAddress, ifup=ifUp,
+                                 ifrunning=ifRunning, change_mask=ifi_change)
+                msg.text = "newaddr event"
+                out_q.put(msg)
+            elif nlmsg_type == nl.RTM_DELADDR:
+                msg = NL_Message(event=NL_Event.DELADDR, ifname=ifName,
+                                 ifaddress=ifAddress, ifup=ifUp,
+                                 ifrunning=ifRunning, change_mask=ifi_change)
+                msg.text = "deladdr event"
+                out_q.put(msg)
 
-            step = nl.nlmsg_align(save_len)
-            status -= step
-
-            data = data[step:]
+            status, data = update_status(status, data, nlmsg_len)
 
 def nl_action(in_q: Queue):
-    @event_decorator(NL_Event.NEWLINK)
+    @action_on_event(NL_Event.NEWLINK)
     def on_newlink():
         print("JSE callback on newlink")
 
+    @action_on_event(NL_Event.DELLINK)
+    def on_dellink():
+        print("JSE callback on dellink")
+
     while True:
         msg = in_q.get()
-        logger.debug(f"JSE msg is {vars(msg)}")
-        msg.invoke_actions()
+        logger.debug(f"msg is {vars(msg)}")
+        msg.run_actions()
 
 def main():
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('--debug', action='store_true')
+    args = argparser.parse_args()
+
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
     q = Queue()
     t1 = Thread(target=nl_action, args=(q, ))
     t2 = Thread(target=nl_receive, args=(q, ))

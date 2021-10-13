@@ -36,13 +36,12 @@ cdef extern from "linux/rtnetlink.h":
     cpdef enum:
         RTMGRP_LINK
         RTMGRP_IPV4_IFADDR
-        RTMGRP_IPV4_ROUTE
         RTM_NEWLINK
         RTM_DELLINK
-        RTM_NEWROUTE
-        RTM_DELROUTE
+        RTM_NEWADDR
+        RTM_DELADDR
     struct ifinfomsg:
-# N.B. Cython has trouble with the padding member (because of mangling of
+# N.B.: Cython has trouble with the padding member (because of mangling of
 # double underscore) before version 3.0.a3 (commit 25b7d7e4), hence only
 # members after the padding are accessible ; stable 3.0 is not released as
 # of this writing.
