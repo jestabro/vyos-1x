@@ -2,8 +2,6 @@ import threading
 from enum import IntEnum, auto
 from typing import Callable
 
-MAX_UINT = 2**32-1
-
 class NL_Event(IntEnum):
     NOEVENT = 0
     NEWLINK = auto()
@@ -15,13 +13,12 @@ class NL_Message():
     event_actions: dict = {NL_Event.NOEVENT: []}
     lock = threading.Lock()
     def __init__(self, event=NL_Event.NOEVENT, ifname='', ifaddress='',
-                 ifup=False, ifrunning=False, change_mask=MAX_UINT):
+                 ifup=False, ifrunning=False):
         self.event: NL_Event = event
         self.ifname: str = ifname
         self.ifaddress: str = ifaddress
         self.ifup: bool = ifup
         self.ifrunning: bool = ifrunning
-        self.change_mask: int = change_mask
         self.text: str = ''
 
     @classmethod

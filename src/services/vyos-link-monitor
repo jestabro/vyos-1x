@@ -127,25 +127,25 @@ def nl_receive(out_q: Queue):
             if nlmsg_type == nl.RTM_NEWLINK:
                 msg = NL_Message(event=NL_Event.NEWLINK, ifname=ifName,
                                  ifaddress=ifAddress, ifup=ifUp,
-                                 ifrunning=ifRunning, change_mask=ifi_change)
+                                 ifrunning=ifRunning)
                 msg.text = "newlink event"
                 out_q.put(msg)
             elif nlmsg_type == nl.RTM_DELLINK:
                 msg = NL_Message(event=NL_Event.DELLINK, ifname=ifName,
                                  ifaddress=ifAddress, ifup=ifUp,
-                                 ifrunning=ifRunning, change_mask=ifi_change)
+                                 ifrunning=ifRunning)
                 msg.text = "dellink event"
                 out_q.put(msg)
             elif nlmsg_type == nl.RTM_NEWADDR:
                 msg = NL_Message(event=NL_Event.NEWADDR, ifname=ifName,
                                  ifaddress=ifAddress, ifup=ifUp,
-                                 ifrunning=ifRunning, change_mask=ifi_change)
+                                 ifrunning=ifRunning)
                 msg.text = "newaddr event"
                 out_q.put(msg)
             elif nlmsg_type == nl.RTM_DELADDR:
                 msg = NL_Message(event=NL_Event.DELADDR, ifname=ifName,
                                  ifaddress=ifAddress, ifup=ifUp,
-                                 ifrunning=ifRunning, change_mask=ifi_change)
+                                 ifrunning=ifRunning)
                 msg.text = "deladdr event"
                 out_q.put(msg)
 
