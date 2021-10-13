@@ -7,9 +7,7 @@ cpdef nlmsghdr get_header(bytes buf):
     cdef const unsigned char[:] buf_view = buf
     cdef char* buf_ptr = <char*>&buf_view[0]
     cdef nlmsghdr hdr = dereference(<nlmsghdr*>buf_ptr)
-#    memcpy(&hdr, buf_ptr, sizeof(nlmsghdr))
     return hdr
-#    return (hdr.nlmsg_len, hdr.nlmsg_type, hdr.nlmsg_flags, hdr.nlmsg_seq, hdr.nlmsg_pid)
 
 cpdef bytes Nlmsg_Data(bytes buf):
     shift_buf = buf[NLMSG_HDRLEN:]
@@ -25,14 +23,14 @@ cpdef bytes Ifa_Rta(bytes buf):
     shift_buf = buf[shift:]
     return shift_buf
 
-cpdef bytes ifa_rta(bytes buf):
-    cdef const unsigned char[:] buf_view = buf
-    cdef char* buf_ptr = <char*>&buf_view[0]
-    buf_ptr = <char*>IFA_RTA(<ifaddrmsg*>buf_ptr)
-    return <bytes>buf_ptr
+#cpdef bytes ifa_rta(bytes buf):
+#    cdef const unsigned char[:] buf_view = buf
+#    cdef char* buf_ptr = <char*>&buf_view[0]
+#    buf_ptr = <char*>IFA_RTA(<ifaddrmsg*>buf_ptr)
+#    return <bytes>buf_ptr
 
-cpdef int get_sizeof_header(nlmsghdr h):
-    return sizeof(h)
+#cpdef int get_sizeof_header(nlmsghdr h):
+#    return sizeof(h)
 
 # N. B. members must be accessed explicitly, due to issue with padding
 # member (cf. comments in netlink.pxd).
