@@ -1,5 +1,6 @@
 import os
-from setuptools import setup
+from setuptools import Extension, setup
+from Cython.Build import cythonize
 
 def packages(directory):
     return [
@@ -7,6 +8,10 @@ def packages(directory):
         for _ in os.walk(directory)
         if os.path.isfile(os.path.join(_[0], '__init__.py'))
     ]
+
+extensions = [
+    Extension("vyos.netlink", ["vyos/netlink/netlink.pyx"])
+]
 
 setup(
     name = "vyos",
@@ -18,6 +23,7 @@ setup(
     keywords = "vyos",
     url = "http://www.vyos.io",
     packages = packages('vyos'),
+    ext_modules = cythonize(extensions, language_level = "3"),
     long_description="VyOS configuration libraries",
     classifiers=[
         "Development Status :: 4 - Beta",

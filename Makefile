@@ -3,6 +3,7 @@ OP_TMPL_DIR := templates-op
 BUILD_DIR := build
 DATA_DIR := data
 SHIM_DIR := src/shim
+CYTHON_DIR := python/vyos/netlink
 XDP_DIR := src/xdp
 LIBS := -lzmq
 CFLAGS :=
@@ -63,6 +64,10 @@ op_mode_definitions: $(op_xml_obj)
 	# could mask help strings or mandatory priority statements
 	find $(OP_TMPL_DIR) -name node.def -type f -empty -exec false {} + || sh -c 'echo "There are empty node.def files! Check your interface definitions." && exit 1'
 
+.PHONY: cython_build
+cython_build:
+	$(MAKE) -C $(CYTHON_DIR)
+
 .PHONY: vyshim
 vyshim:
 	$(MAKE) -C $(SHIM_DIR)
@@ -72,7 +77,7 @@ vyxdp:
 	$(MAKE) -C $(XDP_DIR)
 
 .PHONY: all
-all: clean interface_definitions op_mode_definitions vyshim
+all: clean interface_definitions op_mode_definitions vyshim cython_build
 
 .PHONY: clean
 clean:
@@ -81,6 +86,7 @@ clean:
 	rm -rf $(OP_TMPL_DIR)
 	$(MAKE) -C $(SHIM_DIR) clean
 	$(MAKE) -C $(XDP_DIR) clean
+	$(MAKE) -C $(CYTHON_DIR) clean
 
 .PHONY: test
 test:
