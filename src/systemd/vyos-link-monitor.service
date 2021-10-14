@@ -1,0 +1,25 @@
+[Unit]
+Description=VyOS link state monitor
+
+# Without this option, lots of default dependencies are added,
+# among them network.target, which creates a dependency cycle
+DefaultDependencies=no
+
+# Initial copy from netplug; refine as needed
+After=sysinit.target network-online.target systemd-journald.socket system.slice basic.target
+Before=multi-user.target shutdown.target graphical.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u /usr/libexec/vyos/services/vyos-link-monitor
+Type=idle
+KillMode=process
+
+SyslogIdentifier=vyos-link-monitor
+SyslogFacility=daemon
+
+Restart=on-failure
+
+User=root
+
+[Install]
+WantedBy=vyos.target
