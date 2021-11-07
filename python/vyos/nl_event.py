@@ -29,7 +29,7 @@ class NL_Message():
     lock = threading.Lock()
     def __init__(self, event=NL_Event.NOEVENT, ifname='', ifaddress='',
                  ifup=False, ifrunning=False, ifup_changed=False,
-                 ifrunning_changed=False):
+                 ifrunning_changed=False, ifoperstate=0):
         self.event: NL_Event = event
         self.ifname: str = ifname
         self.ifaddress: str = ifaddress
@@ -37,6 +37,7 @@ class NL_Message():
         self.ifrunning: bool = ifrunning
         self.ifup_changed: bool = ifup_changed
         self.ifrunning_changed: bool = ifrunning_changed
+        self.ifoperstate: int = ifoperstate
         self.text: str = ''
 
     @classmethod

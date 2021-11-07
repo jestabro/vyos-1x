@@ -48,10 +48,16 @@ def parse_rtattr(buf: bytes, max_attr: int) -> dict:
         rta_type = attr['rta_type']
         rta_len = attr['rta_len']
 
+        struct_size = nl.Rta_Length(0)
+
         rta = nl.Rta_Data(buf, rta_len)
 
+        print(f"JSE internal: {rta}")
+        print(f"JSE explicit: {buf[struct_size: rta_len]}")
+
         if rta_type <= max_attr:
-            attrs[rta_type] = rta
+#            attrs[rta_type] = rta
+            attrs[rta_type] = buf[struct_size: rta_len]
 
         # Here we would prefer to use a suitably wrapped RTA_NEXT, however,
         # the macro updates length in place, requiring a pass-by-reference;
@@ -65,7 +71,8 @@ def parse_rtattr(buf: bytes, max_attr: int) -> dict:
 def nl_receive(out_q: Queue):
     try:
         s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-        s.bind((os.getpid(), nl.RTMGRP_LINK | nl.RTMGRP_IPV4_IFADDR))
+#        s.bind((os.getpid(), nl.RTMGRP_LINK | nl.RTMGRP_IPV4_IFADDR))
+        s.bind((os.getpid(), nl.RTNLGRP_LINK | nl.RTNLGRP_IPV4_IFADDR | nl.RTNLGRP_IPV6_IFADDR))
     except OSError as e:
         logger.critical(f"OSError {e}")
 
@@ -100,6 +107,11 @@ def nl_receive(out_q: Queue):
             else:
                 ifName = ''
 
+            if nl.IFLA_OPERSTATE in list(attr_dict):
+                ifOperState = attr_dict[nl.IFLA_OPERSTATE].decode().rstrip('\0')
+            else:
+                ifOperState = ''
+
             ifUp = bool(ifi_flags & nl.IFF_UP)
             ifRunning = bool(ifi_flags & nl.IFF_RUNNING)
 
@@ -124,7 +136,8 @@ def nl_receive(out_q: Queue):
                                  ifaddress=ifAddress, ifup=ifUp,
                                  ifrunning=ifRunning,
                                  ifup_changed=ifUp_changed,
-                                 ifrunning_changed=ifRunning_changed)
+                                 ifrunning_changed=ifRunning_changed,
+                                 ifoperstate=ifOperState)
                 msg.text = "newlink event"
                 out_q.put(msg)
             elif nlmsg_type == nl.RTM_DELLINK:
@@ -132,7 +145,8 @@ def nl_receive(out_q: Queue):
                                  ifaddress=ifAddress, ifup=ifUp,
                                  ifrunning=ifRunning,
                                  ifup_changed=ifUp_changed,
-                                 ifrunning_changed=ifRunning_changed)
+                                 ifrunning_changed=ifRunning_changed,
+                                 ifoperstate=ifOperState)
                 msg.text = "dellink event"
                 out_q.put(msg)
             elif nlmsg_type == nl.RTM_NEWADDR:
@@ -140,7 +154,8 @@ def nl_receive(out_q: Queue):
                                  ifaddress=ifAddress, ifup=ifUp,
                                  ifrunning=ifRunning,
                                  ifup_changed=ifUp_changed,
-                                 ifrunning_changed=ifRunning_changed)
+                                 ifrunning_changed=ifRunning_changed,
+                                 ifoperstate=ifOperState)
                 msg.text = "newaddr event"
                 out_q.put(msg)
             elif nlmsg_type == nl.RTM_DELADDR:
@@ -148,7 +163,8 @@ def nl_receive(out_q: Queue):
                                  ifaddress=ifAddress, ifup=ifUp,
                                  ifrunning=ifRunning,
                                  ifup_changed=ifUp_changed,
-                                 ifrunning_changed=ifRunning_changed)
+                                 ifrunning_changed=ifRunning_changed,
+                                 ifoperstate=ifOperState)
                 msg.text = "deladdr event"
                 out_q.put(msg)
 

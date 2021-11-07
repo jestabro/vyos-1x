@@ -31,6 +31,7 @@ cdef extern from "linux/if_addr.h":
 cdef extern from "linux/if_link.h":
     cpdef enum:
         IFLA_IFNAME
+        IFLA_OPERSTATE
         IFLA_MAX
     rtattr* IFLA_RTA(ifinfomsg*)
 cdef extern from "linux/netlink.h":
@@ -54,6 +55,10 @@ cdef extern from "linux/rtnetlink.h":
         RTM_DELLINK
         RTM_NEWADDR
         RTM_DELADDR
+    cpdef enum:
+        RTNLGRP_LINK
+        RTNLGRP_IPV4_IFADDR
+        RTNLGRP_IPV6_IFADDR
     struct ifinfomsg:
 # N.B.: Cython has trouble with the padding member (because of mangling of
 # double underscore) before version 3.0.a3 (commit 25b7d7e4), hence only
