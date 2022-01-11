@@ -10,7 +10,7 @@ After=sysinit.target network-online.target systemd-journald.socket system.slice 
 Before=multi-user.target shutdown.target graphical.target
 
 [Service]
-ExecStart=/usr/bin/python3 -u /usr/libexec/vyos/services/vyos-link-monitor
+ExecStart=/usr/bin/python3 -u /usr/libexec/vyos/services/vyos-link-monitor --debug
 Type=idle
 KillMode=process
 
