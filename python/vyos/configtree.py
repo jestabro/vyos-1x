@@ -17,6 +17,7 @@ import json
 
 from ctypes import cdll, c_char_p, c_void_p, c_int
 
+LIBPATH = '/usr/lib/libvyosconfig.so.0'
 
 def escape_backslash(string: str) -> str:
     """Escape single backslashes in string that are not in escape sequence"""
@@ -42,8 +43,10 @@ class ConfigTreeError(Exception):
 
 
 class ConfigTree(object):
-    def __init__(self, config_string, libpath='/usr/lib/libvyosconfig.so.0'):
+    def __init__(self, config_string=None, address=None, libpath=LIBPATH):
+        # add arg check TypeError
         self.__config = None
+        self.jse_config = None
         self.__lib = cdll.LoadLibrary(libpath)
 
         # Import functions
@@ -123,18 +126,28 @@ class ConfigTree(object):
         self.__set_tag.argtypes = [c_void_p, c_char_p]
         self.__set_tag.restype = c_int
 
+        # not needed; see below
+        self.__get_add_compare = self.__lib.get_add_compare
+        self.__get_add_compare.argtypes = [c_void_p, c_void_p]
+        self.__get_add_compare.restype = c_void_p
+
         self.__destroy = self.__lib.destroy
         self.__destroy.argtypes = [c_void_p]
 
-        config_section, version_section = extract_version(config_string)
-        config_section = escape_backslash(config_section)
-        config = self.__from_string(config_section.encode())
-        if config is None:
-            msg = self.__get_error().decode()
-            raise ValueError("Failed to parse config: {0}".format(msg))
+        if not address:
+            config_section, version_section = extract_version(config_string)
+            config_section = escape_backslash(config_section)
+            config = self.__from_string(config_section.encode())
+            if config is None:
+                msg = self.__get_error().decode()
+                raise ValueError("Failed to parse config: {0}".format(msg))
+            else:
+                self.__config = config
+                self.jse_config = config
+                self.__version = version_section
         else:
-            self.__config = config
-            self.__version = version_section
+            self.__config = address
+            self.__version = ''
 
     def __del__(self):
         if self.__config is not None:
@@ -142,6 +155,9 @@ class ConfigTree(object):
 
     def __str__(self):
         return self.to_string()
+
+    def _get_config(self):
+        return self.__config
 
     def to_string(self):
         config_string = self.__to_string(self.__config).decode()
@@ -280,4 +296,10 @@ class ConfigTree(object):
             return True
         else:
             raise ConfigTreeError("Path [{}] doesn't exist".format(path_str))
+
+def get_add_compare(left, right, libpath=LIBPATH):
+    lib = cdll.LoadLibrary(libpath)
+    res = lib.get_add_compare(left._get_config(), right._get_config())
+    ct = ConfigTree(address=res)
+    return ct
 
