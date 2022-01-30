@@ -15,7 +15,7 @@
 import re
 import json
 
-from ctypes import cdll, c_char_p, c_void_p, c_int
+from ctypes import cdll, c_char_p, c_void_p, c_int, POINTER
 
 LIBPATH = '/usr/lib/libvyosconfig.so.0'
 
@@ -125,11 +125,6 @@ class ConfigTree(object):
         self.__set_tag = self.__lib.set_tag
         self.__set_tag.argtypes = [c_void_p, c_char_p]
         self.__set_tag.restype = c_int
-
-        # not needed; see below
-        self.__get_add_compare = self.__lib.get_add_compare
-        self.__get_add_compare.argtypes = [c_void_p, c_void_p]
-        self.__get_add_compare.restype = c_void_p
 
         self.__destroy = self.__lib.destroy
         self.__destroy.argtypes = [c_void_p]
@@ -297,9 +292,11 @@ class ConfigTree(object):
         else:
             raise ConfigTreeError("Path [{}] doesn't exist".format(path_str))
 
-def get_add_compare(left, right, libpath=LIBPATH):
-    lib = cdll.LoadLibrary(libpath)
-    res = lib.get_add_compare(left._get_config(), right._get_config())
-    ct = ConfigTree(address=res)
-    return ct
-
+def get_trees(left, right, libpath=LIBPATH):
+    gt = cdll.LoadLibrary(libpath).get_trees
+    gt.restype = POINTER(c_void_p * 3)
+    res = [i for i in gt(left._get_config(), right._get_config()).contents]
+    add = ConfigTree(address=res[0])
+    delete = ConfigTree(address=res[1])
+    inter = ConfigTree(address=res[2])
+    return (add, delete, inter)
