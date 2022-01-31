@@ -292,10 +292,18 @@ class ConfigTree(object):
         else:
             raise ConfigTreeError("Path [{}] doesn't exist".format(path_str))
 
-def difference(left, right, libpath=LIBPATH):
+def difference(left, right, path=[], libpath=LIBPATH):
+    if path:
+        if not left.exists(path):
+            raise ConfigTreeError(f"Path {path} doesn't exist in lhs tree")
+        if not right.exists(path):
+            raise ConfigTreeError(f"Path {path} doesn't exist in rhs tree")
+
+    check_path(path)
+    path_str = " ".join(map(str, path)).encode()
     gt = cdll.LoadLibrary(libpath).difference
     gt.restype = POINTER(c_void_p * 3)
-    res = [i for i in gt(left._get_config(), right._get_config()).contents]
+    res = [i for i in gt(path_str, left._get_config(), right._get_config()).contents]
     diff = {'add': ConfigTree(address=res[0]),
             'del': ConfigTree(address=res[1]),
             'int': ConfigTree(address=res[2]) }
