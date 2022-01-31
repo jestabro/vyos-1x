@@ -129,7 +129,7 @@ class ConfigTree(object):
         self.__destroy = self.__lib.destroy
         self.__destroy.argtypes = [c_void_p]
 
-        if not address:
+        if address is None:
             config_section, version_section = extract_version(config_string)
             config_section = escape_backslash(config_section)
             config = self.__from_string(config_section.encode())
