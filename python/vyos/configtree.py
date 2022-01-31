@@ -292,11 +292,11 @@ class ConfigTree(object):
         else:
             raise ConfigTreeError("Path [{}] doesn't exist".format(path_str))
 
-def get_trees(left, right, libpath=LIBPATH):
-    gt = cdll.LoadLibrary(libpath).get_trees
+def difference(left, right, libpath=LIBPATH):
+    gt = cdll.LoadLibrary(libpath).difference
     gt.restype = POINTER(c_void_p * 3)
     res = [i for i in gt(left._get_config(), right._get_config()).contents]
-    add = ConfigTree(address=res[0])
-    delete = ConfigTree(address=res[1])
-    inter = ConfigTree(address=res[2])
-    return (add, delete, inter)
+    diff = {'add': ConfigTree(address=res[0]),
+            'delete': ConfigTree(address=res[1]),
+            'intersection': ConfigTree(address=res[2]) }
+    return diff
