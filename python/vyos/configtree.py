@@ -44,9 +44,9 @@ class ConfigTreeError(Exception):
 
 class ConfigTree(object):
     def __init__(self, config_string=None, address=None, libpath=LIBPATH):
-        # add arg check TypeError
+        if config_string is None and address is None:
+            raise TypeError("ConfigTree() requires one of 'config_string' or 'address'")
         self.__config = None
-        self.jse_config = None
         self.__lib = cdll.LoadLibrary(libpath)
 
         # Import functions
@@ -138,7 +138,6 @@ class ConfigTree(object):
                 raise ValueError("Failed to parse config: {0}".format(msg))
             else:
                 self.__config = config
-                self.jse_config = config
                 self.__version = version_section
         else:
             self.__config = address
