@@ -87,6 +87,11 @@ class ConfigDiff(object):
         self._session_config_dict = config.get_cached_root_dict(effective=False)
         self._effective_config_dict = config.get_cached_root_dict(effective=True)
         self._key_mangling = key_mangling
+        # transitional change version 1 -> version 2, using configtree.Diff:
+        # introduce proper diff algorithm, under the flag 'recursive' in
+        # functions below; eventually phase out above constructions when
+        # invoking code is updated.
+        self._diff = Diff(config._running_config, config._session_config)
 
     # mirrored from Config; allow path arguments relative to level
     def _make_path(self, path):
