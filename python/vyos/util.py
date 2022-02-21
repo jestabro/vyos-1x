@@ -447,9 +447,9 @@ def dict_from_tree(ct, path=[], key_mangling=None, get_first_key=False,
 
     if get_first_key:
         tmp = next(iter(t_dict.values()))
-    if not isinstance(tmp, dict):
-        raise TypeError("Data under node is not of type dict")
-    t_dict = tmp
+        if not isinstance(tmp, dict):
+            raise TypeError("Data under node is not of type dict")
+        t_dict = tmp
 
     if not key_mangling and no_multi_convert:
         return t_dict
@@ -471,6 +471,42 @@ def dict_from_tree(ct, path=[], key_mangling=None, get_first_key=False,
                               no_tag_node_value_mangle=no_tag_node_value_mangle)
 
     return t_dict
+
+def dict_from_tree_2(ct, path=[], key_mangling=None, get_first_key=False,
+                   no_multi_convert=False, no_tag_node_value_mangle=False):
+    """ Get python dict from arbitrary configtree at path
+
+        This is a direct generalization of the construction in
+        config.get_config_dict for arbitrary config trees;
+        as there, most of the effort regards key_mangling.
+    """
+    import json
+    from vyos.xml import multi_to_list
+
+    root_dict = json.loads(ct.to_json())
+    t_dict = get_sub_dict(root_dict, path, get_first_key)
+
+    if not key_mangling and no_multi_convert:
+        return t_dict
+
+    xmlpath = path if get_first_key else path[:-1]
+    if not key_mangling:
+        return multi_to_list(xmlpath, t_dict)
+
+    if no_multi_convert is False:
+        t_dict = multi_to_list(xmlpath, t_dict)
+
+    if not (isinstance(key_mangling, tuple) and \
+                (len(key_mangling) == 2) and \
+                isinstance(key_mangling[0], str) and \
+                isinstance(key_mangling[1], str)):
+            raise ValueError("key_mangling must be a tuple of two strings")
+    t_dict = mangle_dict_keys(t_dict, key_mangling[0], key_mangling[1],
+                              abs_path=xmlpath,
+                              no_tag_node_value_mangle=no_tag_node_value_mangle)
+
+    return t_dict
+
 
 def process_running(pid_file):
     """ Checks if a process with PID in pid_file is running """

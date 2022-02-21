@@ -18,6 +18,7 @@ from enum import IntFlag, auto
 from vyos.config import Config
 from vyos.configdict import dict_merge
 from vyos.configdict import list_diff
+from vyos.configtree import Diff as CTDiff
 from vyos.util import get_sub_dict, mangle_dict_keys
 from vyos.util import dict_search_args
 from vyos.xml import defaults
@@ -89,9 +90,9 @@ class ConfigDiff(object):
         self._key_mangling = key_mangling
         # transitional change version 1 -> version 2, using configtree.Diff:
         # introduce proper diff algorithm, under the flag 'recursive' in
-        # functions below; eventually phase out above constructions when
+        # functions below; eventually phase out previous constructions when
         # invoking code is updated.
-        #self._diff = Diff(config._running_config, config._session_config)
+        self._diff = CTDiff(config._running_config, config._session_config)
 
     # mirrored from Config; allow path arguments relative to level
     def _make_path(self, path):
@@ -214,7 +215,8 @@ class ConfigDiff(object):
 
         return ret
 
-    def get_node_diff(self, path=[], expand_nodes=Diff(0), no_defaults=False):
+    def get_node_diff(self, path=[], expand_nodes=Diff(0), no_defaults=False,
+                      recursive=False):
         """
         Args:
             path (str|list): config path
@@ -224,6 +226,8 @@ class ConfigDiff(object):
                                   value
             no_detaults=False: if expand_nodes & Diff.MERGE, do not merge default
                                values to ret['merge']
+            recursive=False: if recursive, use configtree diff algorithm,
+                             which is sensitive to any difference in sub-trees
 
         Returns: dict of lists, representing differences between session
                                 and effective config, at path
@@ -232,6 +236,9 @@ class ConfigDiff(object):
                  dict['add']    = session config values, not in effective
                  dict['stable'] = config values in both session and effective
         """
+        if recursive:
+            pass
+
         session_dict = get_sub_dict(self._session_config_dict, self._make_path(path))
         effective_dict = get_sub_dict(self._effective_config_dict, self._make_path(path))
 
