@@ -435,14 +435,21 @@ def dict_from_tree(ct, path=[], key_mangling=None, get_first_key=False,
                    no_multi_convert=False, no_tag_node_value_mangle=False):
     """ Get python dict from arbitrary configtree at path
 
-        This is a simple generalization of the construction in
-        config.get_config_dict for arbitrary config trees; as there, most of
-        the effort regards key_mangling.
+        This is a direct generalization of the construction in
+        config.get_config_dict for arbitrary config trees;
+        as there, most of the effort regards key_mangling.
     """
     import json
     from vyos.xml import multi_to_list
+
     subt = ct.get_subtree(path) if path else ct
     t_dict = json.loads(subt.to_json())
+
+    if get_first_key:
+        tmp = next(iter(t_dict.values()))
+    if not isinstance(tmp, dict):
+        raise TypeError("Data under node is not of type dict")
+    t_dict = tmp
 
     if not key_mangling and no_multi_convert:
         return t_dict

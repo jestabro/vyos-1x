@@ -91,7 +91,7 @@ class ConfigDiff(object):
         # introduce proper diff algorithm, under the flag 'recursive' in
         # functions below; eventually phase out above constructions when
         # invoking code is updated.
-        self._diff = Diff(config._running_config, config._session_config)
+        #self._diff = Diff(config._running_config, config._session_config)
 
     # mirrored from Config; allow path arguments relative to level
     def _make_path(self, path):
