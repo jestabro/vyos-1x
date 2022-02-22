@@ -309,9 +309,10 @@ class Diff:
 
         check_path(path)
         path_str = " ".join(map(str, path)).encode()
-        df = cdll.LoadLibrary(libpath).diffs
-        df.restype = POINTER(c_void_p * 3)
-        res = list(df(path_str, left._get_config(), right._get_config()).contents)
+        self.__df = None
+        self.__df = cdll.LoadLibrary(libpath).diffs
+        self.__df.restype = POINTER(c_void_p * 3)
+        res = list(self.__df(path_str, left._get_config(), right._get_config()).contents)
         self._diff = {'add': ConfigTree(address=res[0]),
                       'del': ConfigTree(address=res[1]),
                       'int': ConfigTree(address=res[2]) }
@@ -319,6 +320,10 @@ class Diff:
         self.add = self._diff['add']
         self.delete = self._diff['del']
         self.inter = self._diff['int']
+
+    def __del__(self):
+        if self.__df is not None:
+            self.__destroy(self.__df)
 
     def to_commands(self):
         add = self.add.to_commands()
