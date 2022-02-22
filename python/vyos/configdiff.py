@@ -13,11 +13,13 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
 from enum import IntFlag, auto
 
 from vyos.config import Config
 from vyos.configdict import dict_merge
 from vyos.configdict import list_diff
+from vyos.configtree import Diff as CTDiff
 from vyos.util import get_sub_dict, mangle_dict_keys
 from vyos.util import dict_search_args
 from vyos.xml import defaults
@@ -87,6 +89,15 @@ class ConfigDiff(object):
         self._session_config_dict = config.get_cached_root_dict(effective=False)
         self._effective_config_dict = config.get_cached_root_dict(effective=True)
         self._key_mangling = key_mangling
+        # transitional change version 1 -> version 2, using configtree.Diff:
+        # introduce proper diff algorithm, under the flag 'recursive' in
+        # functions below; eventually phase out previous constructions when
+        # invoking code is updated.
+        self._diff = CTDiff(config._running_config, config._session_config)
+        self._root_add_dict = json.loads(self._diff.add.to_json())
+        self._root_delete_dict = json.loads(self._diff.delete.to_json())
+        self._root_inter_dict = json.loads(self._diff.inter.to_json())
+        self._root_right_dict = json.loads(self._diff.right.to_json())
 
     # mirrored from Config; allow path arguments relative to level
     def _make_path(self, path):
@@ -135,6 +146,11 @@ class ConfigDiff(object):
         config_dict = mangle_dict_keys(config_dict, self._key_mangling[0],
                                                     self._key_mangling[1])
         return config_dict
+
+    def is_node_changed(self, path=[]):
+        if not self._diff.inter.exists(self._make_path(path)):
+            return True
+        return False
 
     def get_child_nodes_diff_str(self, path=[]):
         ret = {'add': {}, 'change': {}, 'delete': {}}
