@@ -194,6 +194,11 @@ class Config(object):
         """
         return self._config_source.show_config(path, default, effective)
 
+    def get_configtree(self, effective=False):
+        if effective:
+            return self._running_config
+        return self._session_config
+
     def get_cached_root_dict(self, effective=False):
         cached = self._dict_cache.get(effective, {})
         if cached:
