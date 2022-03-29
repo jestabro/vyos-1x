@@ -1,0 +1,291 @@
+diff --git a/src/services/api/graphql/graphql/mutations.py b/src/services/api/graphql/graphql/mutations.py
+index 0c3eb702..93e04631 100644
+--- a/src/services/api/graphql/graphql/mutations.py
++++ b/src/services/api/graphql/graphql/mutations.py
+@@ -20,6 +20,7 @@ from graphql import GraphQLResolveInfo
+ from makefun import with_signature
+ 
+ from .. import state
++from .. import key_auth
+ from api.graphql.recipes.session import Session
+ 
+ mutation = ObjectType("Mutation")
+@@ -53,6 +54,15 @@ def make_mutation_resolver(mutation_name, class_name, session_func):
+                 }
+ 
+             data = kwargs['data']
++            key = data['key']
++
++            auth = key_auth.auth_required(key)
++            if auth is None:
++                return {
++                     "success": False,
++                     "errors": ['invalid API key']
++                }
++
+             session = state.settings['app'].state.vyos_session
+ 
+             # one may override the session functions with a local subclass
+diff --git a/src/services/api/graphql/graphql/queries.py b/src/services/api/graphql/graphql/queries.py
+index e1868091..ed94e433 100644
+--- a/src/services/api/graphql/graphql/queries.py
++++ b/src/services/api/graphql/graphql/queries.py
+@@ -20,6 +20,7 @@ from graphql import GraphQLResolveInfo
+ from makefun import with_signature
+ 
+ from .. import state
++from .. import key_auth
+ from api.graphql.recipes.session import Session
+ 
+ query = ObjectType("Query")
+@@ -53,6 +54,15 @@ def make_query_resolver(query_name, class_name, session_func):
+                 }
+ 
+             data = kwargs['data']
++            key = data['key']
++
++            auth = key_auth.auth_required(key)
++            if auth is None:
++                return {
++                     "success": False,
++                     "errors": ['invalid API key']
++                }
++
+             session = state.settings['app'].state.vyos_session
+ 
+             # one may override the session functions with a local subclass
+diff --git a/src/services/api/graphql/graphql/schema/config_file.graphql b/src/services/api/graphql/graphql/schema/config_file.graphql
+index 31ab26b9..3806cbf3 100644
+--- a/src/services/api/graphql/graphql/schema/config_file.graphql
++++ b/src/services/api/graphql/graphql/schema/config_file.graphql
+@@ -1,8 +1,10 @@
+ input SaveConfigFileInput {
++    key: String!
+     fileName: String
+ }
+ 
+ type SaveConfigFile {
++    key: String
+     fileName: String
+ }
+ 
+@@ -13,10 +15,12 @@ type SaveConfigFileResult {
+ }
+ 
+ input LoadConfigFileInput {
++    key: String!
+     fileName: String!
+ }
+ 
+ type LoadConfigFile {
++    key: String
+     fileName: String!
+ }
+ 
+diff --git a/src/services/api/graphql/graphql/schema/dhcp_server.graphql b/src/services/api/graphql/graphql/schema/dhcp_server.graphql
+index 25f091bf..bbed93c4 100644
+--- a/src/services/api/graphql/graphql/schema/dhcp_server.graphql
++++ b/src/services/api/graphql/graphql/schema/dhcp_server.graphql
+@@ -1,4 +1,5 @@
+ input DhcpServerConfigInput {
++    key: String!
+     sharedNetworkName: String
+     subnet: String
+     defaultRouter: String
+@@ -14,6 +15,7 @@ input DhcpServerConfigInput {
+ }
+ 
+ type DhcpServerConfig {
++    key: String
+     sharedNetworkName: String
+     subnet: String
+     defaultRouter: String
+diff --git a/src/services/api/graphql/graphql/schema/firewall_group.graphql b/src/services/api/graphql/graphql/schema/firewall_group.graphql
+index d89904b9..6870f87e 100644
+--- a/src/services/api/graphql/graphql/schema/firewall_group.graphql
++++ b/src/services/api/graphql/graphql/schema/firewall_group.graphql
+@@ -1,9 +1,11 @@
+ input CreateFirewallAddressGroupInput {
++    key: String!
+     name: String!
+     address: [String]
+ }
+ 
+ type CreateFirewallAddressGroup {
++    key: String
+     name: String!
+     address: [String]
+ }
+@@ -15,11 +17,13 @@ type CreateFirewallAddressGroupResult {
+ }
+ 
+ input UpdateFirewallAddressGroupMembersInput {
++    key: String!
+     name: String!
+     address: [String!]!
+ }
+ 
+ type UpdateFirewallAddressGroupMembers {
++    key: String
+     name: String!
+     address: [String!]!
+ }
+@@ -31,11 +35,13 @@ type UpdateFirewallAddressGroupMembersResult {
+ }
+ 
+ input RemoveFirewallAddressGroupMembersInput {
++    key: String!
+     name: String!
+     address: [String!]!
+ }
+ 
+ type RemoveFirewallAddressGroupMembers {
++    key: String
+     name: String!
+     address: [String!]!
+ }
+@@ -47,11 +53,13 @@ type RemoveFirewallAddressGroupMembersResult {
+ }
+ 
+ input CreateFirewallAddressIpv6GroupInput {
++    key: String!
+     name: String!
+     address: [String]
+ }
+ 
+ type CreateFirewallAddressIpv6Group {
++    key: String
+     name: String!
+     address: [String]
+ }
+@@ -63,11 +71,13 @@ type CreateFirewallAddressIpv6GroupResult {
+ }
+ 
+ input UpdateFirewallAddressIpv6GroupMembersInput {
++    key: String!
+     name: String!
+     address: [String!]!
+ }
+ 
+ type UpdateFirewallAddressIpv6GroupMembers {
++    key: String
+     name: String!
+     address: [String!]!
+ }
+@@ -79,11 +89,13 @@ type UpdateFirewallAddressIpv6GroupMembersResult {
+ }
+ 
+ input RemoveFirewallAddressIpv6GroupMembersInput {
++    key: String!
+     name: String!
+     address: [String!]!
+ }
+ 
+ type RemoveFirewallAddressIpv6GroupMembers {
++    key: String
+     name: String!
+     address: [String!]!
+ }
+diff --git a/src/services/api/graphql/graphql/schema/image.graphql b/src/services/api/graphql/graphql/schema/image.graphql
+index 7d1b4f9d..95f0cfa9 100644
+--- a/src/services/api/graphql/graphql/schema/image.graphql
++++ b/src/services/api/graphql/graphql/schema/image.graphql
+@@ -1,8 +1,10 @@
+ input AddSystemImageInput {
++    key: String!
+     location: String!
+ }
+ 
+ type AddSystemImage {
++    key: String
+     location: String
+     result: String
+ }
+@@ -14,10 +16,12 @@ type AddSystemImageResult {
+ }
+ 
+ input DeleteSystemImageInput {
++    key: String!
+     name: String!
+ }
+ 
+ type DeleteSystemImage {
++    key: String
+     name: String
+     result: String
+ }
+diff --git a/src/services/api/graphql/graphql/schema/interface_ethernet.graphql b/src/services/api/graphql/graphql/schema/interface_ethernet.graphql
+index 32438b31..7bf5e51b 100644
+--- a/src/services/api/graphql/graphql/schema/interface_ethernet.graphql
++++ b/src/services/api/graphql/graphql/schema/interface_ethernet.graphql
+@@ -1,4 +1,5 @@
+ input InterfaceEthernetConfigInput {
++    key: String!
+     interface: String
+     address: String
+     replace: Boolean = true
+@@ -6,6 +7,7 @@ input InterfaceEthernetConfigInput {
+ }
+ 
+ type InterfaceEthernetConfig {
++    key: String
+     interface: String
+     address: String
+     description: String
+diff --git a/src/services/api/graphql/graphql/schema/show.graphql b/src/services/api/graphql/graphql/schema/show.graphql
+index c7709e48..bf8d2070 100644
+--- a/src/services/api/graphql/graphql/schema/show.graphql
++++ b/src/services/api/graphql/graphql/schema/show.graphql
+@@ -1,8 +1,10 @@
+ input ShowInput {
++    key: String!
+     path: [String!]!
+ }
+ 
+ type Show {
++    key: String
+     path: [String]
+     result: String
+ }
+diff --git a/src/services/api/graphql/graphql/schema/show_config.graphql b/src/services/api/graphql/graphql/schema/show_config.graphql
+index 34afd2aa..c6118fa1 100644
+--- a/src/services/api/graphql/graphql/schema/show_config.graphql
++++ b/src/services/api/graphql/graphql/schema/show_config.graphql
+@@ -5,11 +5,13 @@ JSON-serialize in case of JSON output.
+ scalar Generic
+ 
+ input ShowConfigInput {
++    key: String!
+     path: [String!]!
+     configFormat: String
+ }
+ 
+ type ShowConfig {
++    key: String
+     path: [String]
+     result: Generic
+ }
+diff --git a/src/services/api/graphql/key_auth.py b/src/services/api/graphql/key_auth.py
+new file mode 100644
+index 00000000..f756ed6d
+--- /dev/null
++++ b/src/services/api/graphql/key_auth.py
+@@ -0,0 +1,18 @@
++
++from . import state
++
++def check_auth(key_list, key):
++    if not key_list:
++        return None
++    key_id = None
++    for k in key_list:
++        if k['key'] == key:
++            key_id = k['id']
++    return key_id
++
++def auth_required(key):
++    api_keys = None
++    api_keys = state.settings['app'].state.vyos_keys
++    key_id = check_auth(api_keys, key)
++    state.settings['app'].state.vyos_id = key_id
++    return key_id
