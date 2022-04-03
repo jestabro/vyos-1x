@@ -655,6 +655,12 @@ if __name__ == '__main__':
     if app.state.vyos_gql:
         graphql_init(app)
 
+    routes = {}
+    for route in app.routes:
+        route[route.name] = route.path
+
+    logger.info(f"Ednpoints defined: '{routes}'")
+
     try:
         if not server_config['socket']:
             uvicorn.run(app, host=server_config["listen_address"],
