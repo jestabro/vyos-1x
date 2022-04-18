@@ -23,14 +23,15 @@ from tempfile import NamedTemporaryFile
 from vyos.config import Config
 from vyos.remote import urlc
 from vyos.component_version import system_footer
+from vyos.defaults import directories
 
-DEFAULT_CONFIG_FILE = '/opt/vyatta/etc/config/config.boot'
+DEFAULT_CONFIG_PATH = os.path.join(directories['config'], 'config.boot')
 remote_save = None
 
 if len(sys.argv) > 1:
     save_file = sys.argv[1]
 else:
-    save_file = DEFAULT_CONFIG_FILE
+    save_file = DEFAULT_CONFIG_PATH
 
 if re.match(r'\w+:/', save_file):
     try:
