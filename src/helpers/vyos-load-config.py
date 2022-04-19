@@ -38,6 +38,9 @@ class LoadConfig(ConfigSourceSession):
     """A subclass for loading a config file.
     This does not belong in configsource.py, and only has a single caller.
     """
+    def __init__(self):
+        super().__init__()
+
     def load_config(self, file_path):
         try:
             with open(file_path) as f:
@@ -81,13 +84,13 @@ def get_local_config(filename):
             try:
                 config_str = f.read().decode()
             except OSError as e:
-                sys.exit(e)
+                sys.exit(repr(e))
     else:
         with open(fname, 'r') as f:
             try:
                 config_str = f.read()
             except OSError as e:
-                sys.exit(e)
+                sys.exit(repr(e))
 
     return config_str
 
@@ -109,14 +112,14 @@ with tempfile.NamedTemporaryFile() as fp:
     virtual_migration = VirtualMigrator(fp.name)
     try:
         virtual_migration.run()
-    except MigratorError as err:
-        sys.exit('{}'.format(err))
+    except MigratorError as e:
+        sys.exit(repr(e))
 
     migration = Migrator(fp.name)
     try:
         migration.run()
-    except MigratorError as err:
-        sys.exit('{}'.format(err))
+    except MigratorError as e:
+        sys.exit(repr(e))
 
     config.load_config(fp.name)
 
