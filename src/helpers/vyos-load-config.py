@@ -26,13 +26,17 @@ Example: load https://somewhere.net/some.config
 import os
 import sys
 import gzip
+import argparse
 import tempfile
-import vyos.defaults
-import vyos.remote
 from vyos.configsource import ConfigSourceSession
 from vyos.configtree import ConfigTree, DiffTree
 from vyos.migrator import Migrator, VirtualMigrator, MigratorError
+from vyos.remote import get_remote_config
+from vyos.defaults import directories
 from vyos.util import cmd, DEVNULL
+
+DEFAULT_CONFIG_PATH = os.path.join(directories['current'], 'config.boot')
+protocols = ['scp', 'sftp', 'http', 'https', 'ftp', 'tftp']
 
 class LoadConfig(ConfigSourceSession):
     """A subclass for loading a config file.
@@ -67,15 +71,9 @@ class LoadConfig(ConfigSourceSession):
                 print(e)
                 return
 
-file_name = sys.argv[1] if len(sys.argv) > 1 else 'config.boot'
-configdir = vyos.defaults.directories['config']
-protocols = ['scp', 'sftp', 'http', 'https', 'ftp', 'tftp']
-
 def get_local_config(filename):
     if os.path.isfile(filename):
         fname = filename
-    elif os.path.isfile(os.path.join(configdir, filename)):
-        fname = os.path.join(configdir, filename)
     else:
         sys.exit(f"No such file '{filename}'")
 
@@ -94,36 +92,55 @@ def get_local_config(filename):
 
     return config_str
 
-if any(x in file_name for x in protocols):
-    config_string = vyos.remote.get_remote_config(file_name)
-    if not config_string:
-        sys.exit(f"No such config file at '{file_name}'")
-else:
-    config_string = get_local_config(file_name)
+def main():
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('config_file', type=str, nargs='?',
+                           default=DEFAULT_CONFIG_PATH,
+                           help="configuration file to load")
+    argparser.add_argument('--debug', action='store_true', help="Debug")
+    args = argparser.parse_args()
 
-config = LoadConfig()
+    file_name = args.config_file
+    debug = args.debug
 
-print(f"Loading configuration from '{file_name}'")
+    if any(x in file_name for x in protocols):
+        config_string = get_remote_config(file_name)
+        if not config_string:
+            sys.exit(f"No such config file at '{file_name}'")
+    else:
+        config_string = get_local_config(file_name)
 
-with tempfile.NamedTemporaryFile() as fp:
-    with open(fp.name, 'w') as fd:
+    config = LoadConfig()
+
+    print(f"Loading configuration from '{file_name}'")
+
+    tmp_config = tempfile.NamedTemporaryFile(dir='/tmp', delete=False).name
+    with open(tmp_config, 'w') as fd:
         fd.write(config_string)
 
-    virtual_migration = VirtualMigrator(fp.name)
+    virtual_migration = VirtualMigrator(tmp_config)
     try:
         virtual_migration.run()
     except MigratorError as e:
         sys.exit(repr(e))
 
-    migration = Migrator(fp.name)
+    migration = Migrator(tmp_config)
     try:
         migration.run()
     except MigratorError as e:
         sys.exit(repr(e))
 
-    config.load_config(fp.name)
+    config.load_config(tmp_config)
 
-if config.session_changed():
-    print("Load complete. Use 'commit' to make changes effective.")
-else:
-    print("No configuration changes to commit.")
+    if not debug:
+        os.remove(tmp_config)
+    else:
+        print(f"migrated config at {tmp_config}")
+
+    if config.session_changed():
+        print("Load complete. Use 'commit' to make changes effective.")
+    else:
+        print("No configuration changes to commit.")
+
+if __name__ == '__main__':
+    main()
