@@ -51,8 +51,8 @@ class LoadConfig(ConfigSourceSession):
                 config_file = f.read()
             load_ct = ConfigTree(config_file)
         except (OSError, ValueError) as e:
-            print(e)
-            return
+            print(repr(e))
+            return -1
 
         eff_ct, _ = self.get_configtree_tuple()
         diff = DiffTree(eff_ct, load_ct)
@@ -63,13 +63,15 @@ class LoadConfig(ConfigSourceSession):
         command_list = [c for c in command_list if c]
 
         if not command_list:
-            return
+            return 0
         for op in command_list:
             try:
                 cmd(f'/opt/vyatta/sbin/my_{op}', shell=True, stderr=DEVNULL)
             except OSError as e:
-                print(e)
-                return
+                print(e.strerror)
+                return e.errno
+
+        return 0
 
 def get_local_config(filename):
     if os.path.isfile(filename):
