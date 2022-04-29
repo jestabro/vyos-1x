@@ -132,17 +132,22 @@ def main():
     except MigratorError as e:
         sys.exit(repr(e))
 
-    config.load_config(tmp_config)
+    res = config.load_config(tmp_config)
 
     if not debug:
         os.remove(tmp_config)
     else:
         print(f"migrated config at {tmp_config}")
 
+    if res != 0:
+        sys.exit(res)
+
     if config.session_changed():
         print("Load complete. Use 'commit' to make changes effective.")
     else:
         print("No configuration changes to commit.")
+
+    return 0
 
 if __name__ == '__main__':
     main()
