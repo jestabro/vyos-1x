@@ -37,7 +37,6 @@ import re
 import sys
 import fileinput
 
-from vyos.xml import component_version
 from vyos.version import get_version
 from vyos.defaults import directories
 
@@ -84,13 +83,7 @@ def from_file(config_file_name=DEFAULT_CONFIG_PATH, vintage='vyos'):
     # no version information
     return {}
 
-def from_system():
-    """
-    Get system component version dict.
-    """
-    return component_version()
-
-def legacy_from_system():
+def legacy_from_system(fail_on_error=False):
     """
     Get system component version dict from legacy location.
     This is for a transitional sanity check; the directory will eventually
@@ -99,14 +92,13 @@ def legacy_from_system():
     system_versions = {}
     legacy_dir = directories['current']
 
-    # To be removed:
-    if not os.path.isdir(legacy_dir):
-        return system_versions
-
+    # Directory is to be removed in the future:
     try:
         version_info = os.listdir(legacy_dir)
     except OSError as err:
-        sys.exit(repr(err))
+        if fail_on_error:
+            sys.exit(repr(err))
+        return system_versions
 
     for info in version_info:
         if re.match(r'[\w,-]+@\d+', info):
@@ -114,6 +106,17 @@ def legacy_from_system():
             system_versions[pair[0]] = int(pair[1])
 
     return system_versions
+
+def from_system():
+    """
+    Get system component version dict.
+    """
+    try:
+        from vyos.xml import component_version
+    except ImportError:
+        return legacy_from_system(fail_on_error=True)
+
+    return component_version()
 
 def format_string(ver: dict) -> str:
     """
