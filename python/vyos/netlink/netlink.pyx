@@ -46,6 +46,9 @@ cpdef int Nlmsg_Align(int leng):
 cpdef bint Rta_Ok(rtattr attr, int alen):
     return RTA_OK(&attr, alen)
 
+cpdef int Rta_Length(int leng):
+    return RTA_LENGTH(leng)
+
 cpdef bytes Ifla_Rta(bytes buf):
     shift = NLMSG_ALIGN(sizeof(ifinfomsg))
     shift_buf = buf[shift:]

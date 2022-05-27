@@ -31,6 +31,7 @@ cdef extern from "linux/if_addr.h":
 cdef extern from "linux/if_link.h":
     cpdef enum:
         IFLA_IFNAME
+        IFLA_OPERSTATE
         IFLA_MAX
     rtattr* IFLA_RTA(ifinfomsg*)
 cdef extern from "linux/netlink.h":
@@ -50,6 +51,9 @@ cdef extern from "linux/rtnetlink.h":
     cpdef enum:
         RTMGRP_LINK
         RTMGRP_IPV4_IFADDR
+        RTNLGRP_LINK
+        RTNLGRP_IPV4_IFADDR
+        RTNLGRP_IPV6_IFADDR
         RTM_NEWLINK
         RTM_DELLINK
         RTM_NEWADDR
