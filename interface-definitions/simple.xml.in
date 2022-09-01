@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!-- TEST configuration -->
+<interfaceDefinition>
+  <node name="simple" owner="${vyos_conf_scripts_dir}/simple.py">
+    <properties>
+      <help>Test area</help>
+    </properties>
+    <children>
+      <tagNode name="some-tag-node">
+        <properties>
+          <help>Some tag node</help>
+          <valueHelp>
+            <format>some-name</format>
+            <description>Tag node name</description>
+          </valueHelp>
+        </properties>
+        <children>
+          <node name="just-a-node">
+            <properties>
+              <help>Just a normal node; not leaf nor tag</help>
+            </properties>
+            <children>
+              <leafNode name="single-value">
+                <properties>
+                  <help>single value</help>
+                </properties>
+              </leafNode>
+              <leafNode name="multiple-value">
+                <properties>
+                  <help>multiple values</help>
+                  <multi/>
+                </properties>
+              </leafNode>
+            </children>
+          </node>
+        </children>
+      </tagNode>
+    </children>
+  </node>
+</interfaceDefinition>
