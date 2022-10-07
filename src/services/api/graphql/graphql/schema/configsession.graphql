@@ -1,7 +1,7 @@
 
 input ShowConfigInput {
     key: String!
-    path: String!
+    path: [String!]!
     configFormat: String = null
 }
 
@@ -11,7 +11,6 @@ type ShowConfig {
 
 type ShowConfigResult {
     data: ShowConfig
-    op_mode_error: OpModeError
     success: Boolean!
     errors: [String]
 }
@@ -22,7 +21,7 @@ extend type Query {
 
 input ShowInput {
     key: String!
-    path: String!
+    path: [String!]!
 }
 
 type Show {
@@ -31,7 +30,6 @@ type Show {
 
 type ShowResult {
     data: Show
-    op_mode_error: OpModeError
     success: Boolean!
     errors: [String]
 }
@@ -51,7 +49,6 @@ type SaveConfigFile {
 
 type SaveConfigFileResult {
     data: SaveConfigFile
-    op_mode_error: OpModeError
     success: Boolean!
     errors: [String]
 }
@@ -71,7 +68,6 @@ type LoadConfigFile {
 
 type LoadConfigFileResult {
     data: LoadConfigFile
-    op_mode_error: OpModeError
     success: Boolean!
     errors: [String]
 }
@@ -91,7 +87,6 @@ type AddSystemImage {
 
 type AddSystemImageResult {
     data: AddSystemImage
-    op_mode_error: OpModeError
     success: Boolean!
     errors: [String]
 }
@@ -111,7 +106,6 @@ type DeleteSystemImage {
 
 type DeleteSystemImageResult {
     data: DeleteSystemImage
-    op_mode_error: OpModeError
     success: Boolean!
     errors: [String]
 }

@@ -123,5 +123,4 @@ def make_config_session_query_resolver(query_name):
                                convert_camel_case_to_snake(query_name))
 
 def make_gen_op_query_resolver(query_name):
-    class_name = query_name
-    return make_query_resolver(query_name, class_name, 'gen_op_query')
+    return make_query_resolver(query_name, query_name, 'gen_op_query')
