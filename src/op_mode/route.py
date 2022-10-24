@@ -83,7 +83,12 @@ def show(raw: bool,
 
         if raw:
             from json import loads
-            return loads(output)
+            d = loads(output)
+            collect = []
+            for k,v in d.items():
+                for l in d[k]:
+                    collect.append(l)
+            return collect
         else:
             return output
 
