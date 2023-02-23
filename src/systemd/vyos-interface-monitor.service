@@ -1,0 +1,23 @@
+[Unit]
+Description=VyOS interface monitor
+DefaultDependencies=no
+Wants=systemd-udevd.service
+After=systemd-udevd-control.socket systemd-udevd-kernel.socket
+Before=sysinit.target systemd-udev-trigger.service vyos-router.service
+
+[Service]
+ExecStart=/usr/bin/python3 -u /usr/libexec/vyos/services/vyos-interface-monitor
+Type=idle
+KillMode=process
+
+SyslogIdentifier=vyos-interface-monitor
+SyslogFacility=daemon
+
+Restart=on-failure
+
+# Does't work in Jessie but leave it here
+User=root
+Group=vyattacfg
+
+[Install]
+WantedBy=sysinit.target
