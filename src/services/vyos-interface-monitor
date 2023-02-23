@@ -1,0 +1,566 @@
+#!/usr/bin/env python3
+#
+# Copyright (C) 2023 VyOS maintainers and contributors
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or later as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+
+import os
+import re
+import grp
+import json
+import time
+import logging
+import signal
+from typing import TypedDict, Optional, Union
+import netaddr
+import pyudev
+
+from vyos.configtree import ConfigTree
+from vyos.configsession import ConfigSession
+from vyos.util import cmd, boot_configuration_complete
+from vyos.version import get_full_version_data
+
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(levelname)s: %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+CFG_GROUP = 'vyattacfg'
+FIXED = 'fixed'
+FOUND = 'found'
+
+config_path = '/opt/vyatta/etc/config/config.boot'
+interface_map = '/opt/vyatta/etc/config/interface.map'
+
+is_install = bool(get_full_version_data()['boot_via'] == 'livecd')
+
+class AddInterface(TypedDict):
+    hwid: str
+    intf: str
+    intf_type: str
+
+class RemoveInterface(TypedDict):
+    intf: str
+    intf_type: str
+
+passlist = {
+    '02:07:01' : 'Interlan',
+    '02:60:60' : '3Com',
+    '02:60:8c' : '3Com',
+    '02:a0:c9' : 'Intel',
+    '02:aa:3c' : 'Olivetti',
+    '02:cf:1f' : 'CMC',
+    '02:e0:3b' : 'Prominet',
+    '02:e6:d3' : 'BTI',
+    '52:54:00' : 'Realtek',
+    '52:54:4c' : 'Novell 2000',
+    '52:54:ab' : 'Realtec',
+    'e2:0c:0f' : 'Kingston Technologies'
+}
+
+interface_mapping: dict = {FIXED: {},
+                           FOUND: {}}
+
+def hwid_to_netaddr(hwid: str) -> netaddr.eui.EUI:
+    naddr = netaddr.EUI(hwid)
+    naddr.dialect = netaddr.mac_unix_expanded
+    return naddr
+
+def netaddr_to_hwid(naddr: netaddr.eui.EUI) -> str:
+    return str(naddr)
+
+def hwid_from_bare(bare) -> str:
+    naddr = hwid_to_netaddr(bare)
+    return netaddr_to_hwid(naddr)
+
+def is_multicast(naddr: netaddr.eui.EUI):
+    return bool(naddr.words[0] & 0b01)
+
+def is_locally_administered(naddr: netaddr.eui.EUI):
+    return bool(naddr.words[0] & 0b10)
+
+def is_on_passlist(naddr: netaddr.eui.EUI):
+    hwid = netaddr_to_hwid(naddr)
+    top = hwid.rsplit(':', 3)[0]
+    if top in list(passlist):
+        return True
+    return False
+
+def is_persistent(hwid: str):
+    naddr = hwid_to_netaddr(hwid)
+    if is_multicast(naddr):
+        return False
+    if is_locally_administered(naddr) and not is_on_passlist(naddr):
+        return False
+    return True
+
+def filtered_interface(hwid: str, intf: str) -> bool:
+    """Ignore no longer existing interfaces or non-persistent mac addresses
+    """
+    if not os.path.isdir(os.path.join('/sys/class/net', intf)):
+        return True
+    if not is_persistent(hwid):
+        return True
+    return False
+
+def _compare(intf: str):
+    """compare function for sort such that 'eth3' < 'eth10'
+    """
+    return tuple(filter(None, re.split(r'^([a-z]+)', intf, maxsplit=1)))
+
+def sort_interface_mapping(m: dict):
+    """Sort for JSON output to interface.map
+    """
+    return dict(sorted(m.items(), key=lambda k: _compare(k[1])))
+
+def sort_add_interface(l: list[AddInterface]) -> list[AddInterface]:
+    """Sort for writing to config file
+    """
+    return sorted(l, key=lambda k: _compare(k['intf']), reverse=True)
+
+def get_wireless_physical_device(intf: str) -> str:
+    if 'wlan' not in intf:
+        return ''
+    try:
+        tmp = os.readlink(f'/sys/class/net/{intf}/phy80211')
+    except OSError:
+        logger.info(f"failed to read '/sys/class/net/{intf}/phy80211'")
+        return ''
+    phy = os.path.basename(tmp)
+    logger.debug(f"wireless phy is {phy}")
+    return phy
+
+def load_config(path: str) -> None:
+    if not boot_configuration_complete():
+        return
+    logger.info("loading updated config")
+    session = ConfigSession(os.getpid())
+    session.load_config(path)
+    session.commit()
+
+def write_config_add(added: Union[list[AddInterface],AddInterface]):
+    """Write added interfaces to config file
+    """
+    if not isinstance(added, list):
+        added = [added]
+    if not added:
+        return
+    try:
+        with open(config_path) as f:
+            config_file = f.read()
+        config = ConfigTree(config_file)
+    except OSError as e:
+        logger.critical(e)
+
+    added = sort_add_interface(added)
+
+    for ifdata in added:
+        hwid = ifdata['hwid']
+        intf = ifdata['intf']
+        intf_type = ifdata['intf_type']
+
+        config.set(['interfaces', intf_type, intf, 'hw-id'], value=hwid)
+        config.set_tag(['interfaces', intf_type])
+        if intf_type == 'wireless':
+            phy = get_wireless_physical_device(intf)
+            if not phy:
+                continue
+            config.set(['interfaces', intf_type, intf, 'physical-device'],
+                       value=phy)
+    try:
+        with open(config_path, 'w') as f:
+            f.write(config.to_string())
+    except OSError as e:
+        logger.critical(e)
+
+def write_config_remove(removed: Union[list[RemoveInterface],RemoveInterface]):
+    """Write removed interfaces to config file
+    """
+    if not isinstance(removed, list):
+        removed = [removed]
+    if not removed:
+        return
+    try:
+        with open(config_path) as f:
+            config_file = f.read()
+        config = ConfigTree(config_file)
+    except OSError as e:
+        logger.critical(e)
+
+    for ifdata in removed:
+        intf = ifdata['intf']
+        intf_type = ifdata['intf_type']
+
+        if config.exists(['interfaces', intf_type, intf]):
+            config.delete(['interfaces', intf_type, intf])
+    try:
+        with open(config_path, 'w') as f:
+            f.write(config.to_string())
+    except OSError as e:
+        logger.critical(e)
+
+def add_fixed_interface(hwid, intf, commit_result=False) -> Optional[AddInterface]:
+    """Add interface to internal fixed interface map; return AddInterface
+    type.
+    commit_result is reserved for use in hot-plugged devices.
+    """
+    res = None
+
+    if 'eth' in intf:
+        intf_type = 'ethernet'
+    elif 'wlan' in intf:
+        intf_type = 'wireless'
+    else:
+        return res
+
+    interface_mapping[FIXED][hwid] = intf
+
+    res = AddInterface({'hwid': hwid, 'intf': intf, 'intf_type': intf_type})
+
+    if not commit_result:
+        return res
+
+    if not write_fixed_mapping():
+        logger.critical("write_fixed_mapping of interfaces failed")
+
+    write_config_add(res)
+
+    load_config(config_path)
+
+    return res
+
+def remove_fixed_interface(hwid, commit_result=False) -> Optional[RemoveInterface]:
+    """Remove interface from internal fixed interface map; return
+    RemoveInterface type.
+    commit_result is reserved for use in hot-plugged devices.
+    """
+    res = None
+
+    intf = interface_mapping[FIXED].get(hwid, '')
+    if 'eth' in intf:
+        intf_type = 'ethernet'
+    elif 'wlan' in intf:
+        intf_type = 'wireless'
+    else:
+        return res
+
+    intf = interface_mapping[FIXED].pop(hwid)
+
+    res = RemoveInterface({'intf': intf, 'intf_type': intf_type})
+
+    if not commit_result:
+        return res
+
+    if not write_fixed_mapping():
+        logger.critical("write_fixed_mapping of interfaces failed")
+
+    write_config_remove(res)
+
+    load_config(config_path)
+
+    return res
+
+def update_mapping(which, hwid, intf) -> None:
+    if not hwid or not intf:
+        return
+
+    interface_mapping[which][hwid] = intf
+
+def read_interface_config() -> bool:
+    try:
+        with open(config_path) as f:
+            config_file = f.read()
+    except OSError:
+        return False
+
+    config = ConfigTree(config_file)
+
+    for intf_type in ('ethernet', 'wireless'):
+        base = ['interfaces', intf_type]
+        if not config.exists(base):
+            continue
+        nodes = config.list_nodes(base)
+        for intf in nodes:
+            hwid = config.return_value(base + [intf] + ['hw-id'])
+            if not hwid:
+                return False
+            update_mapping(FIXED, hwid, intf)
+
+    return True
+
+def read_fixed_mapping() -> bool:
+    try:
+        with open(interface_map) as f:
+            interface_mapping[FIXED] = json.load(f)
+    except OSError:
+        return False
+
+    return True
+
+def write_fixed_mapping() -> bool:
+    mapping = interface_mapping[FIXED]
+    mapping = sort_interface_mapping(mapping)
+    try:
+        with open(interface_map, 'w') as f:
+            json.dump(mapping, f, indent=2)
+    except OSError:
+        return False
+    else:
+        return True
+
+def load_fixed_mapping() -> bool:
+    """Look for existing mapping hwid -> interface names in:
+    1) interface.map
+    2) config.boot
+    """
+    if read_fixed_mapping():
+        return True
+    if read_interface_config():
+        return True
+    return False
+
+def load_found_mapping(context) -> bool:
+    """Load map of hwid -> interface names, as reported by udev.
+    """
+    for device in context.list_devices(subsystem='net'):
+        naddr = None
+        intf = None
+        naddr = device.properties.get('ID_NET_NAME_MAC', '')
+        naddr = naddr[-12:] if naddr is not None else None
+        intf = device.properties.get('INTERFACE', '')
+
+        if not naddr or not intf:
+            continue
+
+        hwid = hwid_from_bare(naddr)
+        if filtered_interface(hwid, intf):
+            continue
+
+        update_mapping(FOUND, hwid, intf)
+
+    return True
+
+def get_biosdevname(intf: str) -> str:
+    """Use biosdevname to query for 'correct' name
+    """
+    if 'eth' not in intf:
+        return intf
+    if os.path.isdir('/proc/xen'):
+        return intf
+
+    try:
+        biosname = cmd(f'/sbin/biosdevname --policy all_ethN -i {intf}')
+    except Exception as e:
+        logger.debug(e)
+        biosname = ''
+
+    return intf if biosname == '' else biosname
+
+def set_biosdevname_mapping() -> None:
+    """Set fixed interface map to biosdevname of kernel name.
+    Used in the absence of a pre-existing interface map, for example during
+    installation.
+    """
+    if interface_mapping[FIXED]:
+        logger.error("interface_mapping already defined")
+        return
+
+    tmp: dict = { k: get_biosdevname(v) for k, v in
+                 interface_mapping[FOUND].items() }
+
+    if len(tmp) != len(interface_mapping[FOUND]):
+        logger.info("collision in biodevnames")
+        return
+
+    interface_mapping[FIXED] = tmp.copy()
+
+def add_interfaces(intfs: dict) -> list[AddInterface]:
+    """Add dict of interface data to internal fixed map; return list of
+    AddInterface type.
+    """
+    if not intfs:
+        return []
+
+    added_interfaces = []
+    for hwid, intf in intfs.items():
+        res = add_fixed_interface(hwid, intf)
+        if res is None:
+            continue
+        added_interfaces.append(res)
+
+    return added_interfaces
+
+def remove_interfaces(ids: set) -> list[RemoveInterface]:
+    """Remove set of hwids from internal fixed interface map; return list of
+    RemoveInterface type.
+    """
+    if not ids:
+        return []
+
+    removed_interfaces = []
+    for hwid in ids:
+        res = remove_fixed_interface(hwid)
+        if not res:
+            continue
+        removed_interfaces.append(res)
+
+    return removed_interfaces
+
+def interface_rename(old: str, new: str) -> None:
+    try:
+        cmd(f'ip link set {old} down')
+        cmd(f'ip link set {old} name {new}')
+        cmd(f'ip link set {new} up')
+    except Exception as e:
+        logger.critical(f"Failed to rename interfaces: {e}")
+
+def temporary_name(intf: str) -> str:
+    return f'tmp{intf}'
+
+def reorder_interfaces(addrs: set, fixed: dict, found: dict) -> None:
+    if not addrs or boot_configuration_complete():
+        return
+
+    rename = addrs.copy()
+    remove = set()
+    for a in rename:
+        if fixed[a] == found[a]:
+            remove.add(a)
+    rename = rename - remove
+    for a in rename:
+        interface_rename(found[a], temporary_name(found[a]))
+        logger.debug(f"rename {found[a]} -> {temporary_name(found[a])}")
+    for a in rename:
+        interface_rename(temporary_name(found[a]), fixed[a])
+        logger.debug(f"rename {temporary_name(found[a])} -> {fixed[a]}")
+
+def initialize(context):
+    if not load_found_mapping(context):
+        logger.error("no interfaces found")
+        return
+    if not load_fixed_mapping():
+        logger.debug("no load_fixed_mapping()")
+        set_biosdevname_mapping()
+
+    logger.debug(f"defined interface map: {interface_mapping['fixed']}")
+    logger.debug(f"udev reported interface map: {interface_mapping['found']}")
+
+    fixed_mapping = interface_mapping[FIXED]
+    found_mapping = interface_mapping[FOUND]
+
+    fixed_set = set(fixed_mapping)
+    found_set = set(found_mapping)
+
+    intersection = fixed_set & found_set
+    remove_set = fixed_set - intersection
+    add_set = found_set - intersection
+
+    intersection_dict = {k: fixed_mapping[k] for k in intersection}
+    add_dict = {k: found_mapping[k] for k in add_set}
+
+    removed = remove_interfaces(remove_set)
+    reorder_interfaces(intersection, fixed_mapping,
+                       found_mapping)
+    inter = add_interfaces(intersection_dict)
+    add = add_interfaces(add_dict)
+    added = inter + add
+
+    if not write_fixed_mapping():
+        logger.critical("write_fixed_mapping of interfaces failed")
+
+    if not is_install:
+        write_config_remove(removed)
+        write_config_add(added)
+
+    if is_install:
+        count = 0
+        while not boot_configuration_complete():
+            time.sleep(0.25)
+            count+=1
+        logger.debug(f"count is {count}")
+
+        write_config_remove(removed)
+        write_config_add(added)
+
+def main():
+    cfg_group = grp.getgrnam(CFG_GROUP)
+    os.setgid(cfg_group.gr_gid)
+
+    # preserve vyattacfg group write access to running config
+    os.umask(0o002)
+
+    debug = False
+
+    try:
+        with open('/proc/cmdline', 'r') as f:
+            cmdline = f.read()
+        if 'vyos-interface-debug' in cmdline:
+            os.environ['VYOS_INTERFACE_DEBUG'] = 'yes'
+            debug = True
+    except OSError as e:
+        print(e)
+
+    if debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
+    context = pyudev.Context()
+
+    initialize(context)
+
+    monitor = pyudev.Monitor.from_netlink(context)
+    monitor.filter_by('net')
+
+    def interface_event(device):
+        logger.info(f"udev event, device is {device}; action is {device.action}")
+        bare = None
+        intf = None
+        bare = device.properties.get('ID_NET_NAME_MAC', '')
+        bare = bare[-12:]
+        intf = device.properties.get('INTERFACE', '')
+        action = device.action
+
+        if not bare or not intf:
+            return
+
+        hwid = hwid_from_bare(bare)
+
+        if action == 'add':
+            logger.info(f"adding {hwid}, {intf}")
+        if action == 'remove':
+            logger.info(f"removing {hwid}, {intf}")
+        if action == 'move':
+            for p in list(device.properties):
+                logger.info(f"device.properties[{p}] = {device.properties[p]}")
+
+    def sig_handler(signum, frame):
+        observer.stop()
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, sig_handler)
+
+    observer = pyudev.MonitorObserver(monitor, callback=interface_event)
+    observer.start()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("exiting")
+
+if __name__ == '__main__':
+    main()
