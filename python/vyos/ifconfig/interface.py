@@ -1399,7 +1399,8 @@ class Interface(Control):
         # Change interface MAC address - re-set to real hardware address (hw-id)
         # if custom mac is removed. Skip if bond member.
         if 'is_bond_member' not in config:
-            mac = config.get('hw_id')
+        #    mac = config.get('hw_id')
+            mac = ''
             if 'mac' in config:
                 mac = config.get('mac')
             if mac:
