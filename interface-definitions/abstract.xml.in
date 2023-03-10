@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!-- TEST configuration -->
+<interfaceDefinition>
+  <node name="abstract" owner="${vyos_conf_scripts_dir}/abstract.py">
+    <properties>
+      <help>Test area</help>
+    </properties>
+    <children>
+      <tagNode name="some-tag-node">
+        <properties>
+          <help>Some tag node</help>
+          <constraint>
+            <regex>^some[0-9]+$</regex>
+          </constraint>
+          <constraintErrorMessage>Tag node must be named someN</constraintErrorMessage>
+          <valueHelp>
+            <format>someN</format>
+            <description>Tag node name</description>
+          </valueHelp>
+        </properties>
+        <defaultValue>some137</defaultValue>
+        <children>
+          <node name="just-a-node">
+            <properties>
+              <help>intermediary node</help>
+            </properties>
+            <children>
+              <leafNode name="single-value">
+                <properties>
+                  <help>single value</help>
+                </properties>
+              </leafNode>
+              <leafNode name="multiple-value">
+                <properties>
+                  <help>multiple values</help>
+                  <multi/>
+                </properties>
+              </leafNode>
+            </children>
+          </node>
+        </children>
+      </tagNode>
+    </children>
+  </node>
+</interfaceDefinition>
