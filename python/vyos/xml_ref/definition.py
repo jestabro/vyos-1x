@@ -13,8 +13,8 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
-from vyos.util import get_sub_dict
+from typing import Union, Optional
+from vyos.configdict import dict_merge
 
 class Xml:
     def __init__(self):
@@ -122,7 +122,8 @@ class Xml:
 
         return {}
 
-    def relative_defaults(self, path: list, conf: dict = None, get_first_key=False) -> dict:
+    def relative_defaults(self, path: list, conf: Optional[dict] = None,
+                          get_first_key=False) -> dict:
         if conf is None:
             conf = {}
         res = {}
@@ -154,11 +155,14 @@ class Xml:
 
     def merge_defaults(self, path: list, conf: dict) -> dict:
         if path[-1] in list(conf):
-            conf = conf[path[-1]]
-            if not isinstance(conf, dict):
+            config = conf[path[-1]]
+            if not isinstance(config, dict):
                 raise ValueError('conf at path is not of type dict')
             first = False
         else:
+            config = conf
             first = True
 
-        return self.relative_defaults(path, conf=conf, get_first_key=first)
+        d = self.relative_defaults(path, conf=config, get_first_key=first)
+        d = dict_merge(d, conf)
+        return d
