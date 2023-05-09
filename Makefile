@@ -27,7 +27,7 @@ interface_definitions: $(config_xml_obj)
 
 	$(CURDIR)/scripts/override-default $(BUILD_DIR)/interface-definitions
 
-	$(CURDIR)/python/vyos/xml_cache_generate.py --xml-dir $(BUILD_DIR)/interface-definitions
+	$(CURDIR)/python/vyos/xml_ref/generate_cache.py --xml-dir $(BUILD_DIR)/interface-definitions
 
 	find $(BUILD_DIR)/interface-definitions -type f -name "*.xml" | xargs -I {} $(CURDIR)/scripts/build-command-templates {} $(CURDIR)/schema/interface_definition.rng $(TMPL_DIR) || exit 1
 
