@@ -92,13 +92,32 @@ class Xml:
         d = self._get_ref_path(path)
         return self._is_leaf_node(d)
 
-    def multi_to_list(self, rpath: list, d: dict) -> dict:
-        pass
+    def multi_to_list(self, rpath: list, conf: dict) -> dict:
+        if rpath and rpath[-1] in list(conf):
+            raise ValueError('rpath should be disjoint from conf keys')
+
+        res = copy.deepcopy(conf)
+        for k in list(res):
+            d = self._get_ref_path(rpath + [k])
+            if self._is_leaf_node(d):
+                if self._is_multi_node(d) and not isinstance(res[k], list):
+                    res[k] = [res[k]]
+            else:
+                self.multi_to_list(rpath + [k], res[k])
+
+        return res
 
     def _get_default_value(self, node: dict):
         return self._get_ref_node_data(node, "default_value")
 
     def get_defaults(self, path: list, get_first_key=False) -> dict:
+        """Return dict containing default values below path
+
+        Note that descent below path will not proceed beyond an encountered
+        tag node, as no tag node value is known. For a default dict relative
+        to an existing config dict containing tag node values, see function:
+        'relative_defaults'
+        """
         res: Any = {}
         d = self._get_ref_path(path)
         if self._is_leaf_node(d):
@@ -118,7 +137,7 @@ class Xml:
                 pos = self.get_defaults(path + [k])
                 res |= pos
         if res:
-            if get_first_key:
+            if get_first_key or not path:
                 if not isinstance(res, dict):
                     raise TypeError("Cannot get_first_key as data under node is not of type dict")
                 return res
@@ -126,38 +145,42 @@ class Xml:
 
         return {}
 
-    def relative_defaults(self, path: list, conf: Optional[dict] = None,
+    def relative_defaults(self, rpath: list, conf: Optional[dict] = None,
                           get_first_key=False) -> dict:
         if conf is None:
             conf = {}
+        if rpath and rpath[-1] in list(conf):
+            raise ValueError('rpath should be disjoint from conf keys')
         res: Any = {}
-        d = self._get_ref_path(path)
+        d = self._get_ref_path(rpath)
         if self._is_leaf_node(d):
             default_value = self._get_default_value(d)
             if default_value is not None:
                 res = default_value
                 if self._is_multi_node(d) and not isinstance(res, list):
                     res = [res]
-        elif self.is_tag(path):
+        elif self.is_tag(rpath):
             for k in list(conf):
-                pos = self.relative_defaults(path + [k], conf[k])
+                pos = self.relative_defaults(rpath + [k], conf[k])
                 res |= pos
         else:
             for k in list(d):
                 if k == 'node_data':
                     continue
-                pos = self.relative_defaults(path + [k], conf.get(k, {}))
+                pos = self.relative_defaults(rpath + [k], conf.get(k, {}))
                 res |= pos
         if res:
-            if get_first_key:
+            if get_first_key or not rpath:
                 if not isinstance(res, dict):
                     raise TypeError("Cannot get_first_key as data under node is not of type dict")
                 return res
-            return {path[-1]: res}
+            return {rpath[-1]: res}
 
         return {}
 
     def merge_defaults(self, path: list, conf: dict) -> dict:
+        if not path:
+            path = [next(iter(conf.keys()))]
         if path[-1] in list(conf):
             config = conf[path[-1]]
             if not isinstance(config, dict):

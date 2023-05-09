@@ -46,6 +46,9 @@ def is_valueless(path: list) -> bool:
 def is_leaf(path: list) -> bool:
     return load_reference().is_leaf(path)
 
+def multi_to_list(rpath: list, conf: dict):
+    return load_reference().multi_to_list(rpath, conf)
+
 def get_defaults(path: list, get_first_key=False) -> dict:
     return load_reference().get_defaults(path, get_first_key=get_first_key)
 
