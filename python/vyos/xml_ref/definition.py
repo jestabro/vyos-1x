@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union, Optional
+from typing import Union, Optional, Any
 from vyos.configdict import dict_merge
 
 class Xml:
@@ -67,14 +67,18 @@ class Xml:
         return self.is_tag(path[:-1])
 
     def _is_multi_node(self, node: dict) -> bool:
-        return  self._get_ref_node_data(node, 'multi')
+        b = self._get_ref_node_data(node, 'multi')
+        assert isinstance(b, bool)
+        return b
 
     def is_multi(self, path: list) -> bool:
         d = self._get_ref_path(path)
         return  self._is_multi_node(d)
 
     def _is_valueless_node(self, node: dict) -> bool:
-        return  self._get_ref_node_data(node, 'valueless')
+        b = self._get_ref_node_data(node, 'valueless')
+        assert isinstance(b, bool)
+        return b
 
     def is_valueless(self, path: list) -> bool:
         d = self._get_ref_path(path)
@@ -95,7 +99,7 @@ class Xml:
         return self._get_ref_node_data(node, "default_value")
 
     def get_defaults(self, path: list, get_first_key=False) -> dict:
-        res = {}
+        res: Any = {}
         d = self._get_ref_path(path)
         if self._is_leaf_node(d):
             default_value = self._get_default_value(d)
@@ -126,7 +130,7 @@ class Xml:
                           get_first_key=False) -> dict:
         if conf is None:
             conf = {}
-        res = {}
+        res: Any = {}
         d = self._get_ref_path(path)
         if self._is_leaf_node(d):
             default_value = self._get_default_value(d)
