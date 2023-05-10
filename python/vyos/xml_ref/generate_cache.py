@@ -23,6 +23,7 @@ from os.path import join
 from os.path import abspath
 from os.path import dirname
 from os.path import isdir
+from xmltodict import parse
 
 _here = dirname(__file__)
 
@@ -30,7 +31,8 @@ sys.path.append(join(_here, '..'))
 from configtree import reference_tree_to_json, ConfigTreeError
 
 xml_cache = abspath(join(_here, 'cache.py'))
-xml_tmp = '/tmp/xml_cache.json'
+xml_cache_json = 'xml_cache.json'
+xml_tmp = join('/tmp', xml_cache_json)
 
 node_data_fields = ("node_type", "multi", "valueless", "default_value")
 
@@ -48,9 +50,12 @@ def main():
     parser = argparse.ArgumentParser(description='generate and save dict from xml defintions')
     parser.add_argument('--xml-dir', type=str, required=True,
                         help='transcluded xml interface-definition directory')
+    parser.add_argument('--save-json-dir', type=str,
+                        help='directory to save json cache if needed')
     args = parser.parse_args()
 
     xml_dir = abspath(args.xml_dir)
+    save_dir = abspath(args.save_json_dir) if args.save_json_dir else None
 
     try:
         reference_tree_to_json(xml_dir, xml_tmp)
@@ -62,6 +67,26 @@ def main():
         d = json.loads(f.read())
 
     trim_cache(d)
+
+    if save_dir is not None:
+        save_file = join(save_dir, xml_cache_json)
+        with open(save_file, 'w') as f:
+            f.write(json.dumps(d))
+
+    syntax_version = join(xml_dir, 'xml-component-version.xml')
+    with open(syntax_version) as f:
+        content = f.read()
+
+    parsed = parse(content)
+    converted = parsed['interfaceDefinition']['syntaxVersion']
+    version = {}
+    for i in converted:
+        tmp = {i['@component']: i['@version']}
+        version |= tmp
+
+    version = {"component_version": version}
+
+    d |= version
 
     with open(xml_cache, 'w') as f:
         f.write(f'reference = {str(d)}')
