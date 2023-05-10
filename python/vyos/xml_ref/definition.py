@@ -92,6 +92,12 @@ class Xml:
         d = self._get_ref_path(path)
         return self._is_leaf_node(d)
 
+    def component_version(self) -> dict:
+        d = {}
+        for k, v in self.ref['component_version']:
+            d[k] = int(v)
+        return d
+
     def multi_to_list(self, rpath: list, conf: dict):
         """In-place modification of config dict for multi-node string
         """

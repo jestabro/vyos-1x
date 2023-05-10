@@ -45,6 +45,9 @@ def is_valueless(path: list) -> bool:
 def is_leaf(path: list) -> bool:
     return load_reference().is_leaf(path)
 
+def component_version() -> dict:
+    return load_reference().component_version()
+
 def multi_to_list(rpath: list, conf: dict):
     return load_reference().multi_to_list(rpath, conf)
 
