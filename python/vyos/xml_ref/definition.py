@@ -93,6 +93,8 @@ class Xml:
         return self._is_leaf_node(d)
 
     def multi_to_list(self, rpath: list, conf: dict):
+        """In-place modification of config dict for multi-node string
+        """
         if rpath and rpath[-1] in list(conf):
             raise ValueError('rpath should be disjoint from conf keys')
 
@@ -144,6 +146,12 @@ class Xml:
 
     def relative_defaults(self, rpath: list, conf: Optional[dict] = None,
                           get_first_key=False) -> dict:
+        """Return dict containing defaults along paths of a config dict
+
+        Note that for conf argument {} or None, this function returns the
+        same result as 'get_defaults' above; for clarity, the functions are
+        individually defined.
+        """
         if conf is None:
             conf = {}
         if rpath and rpath[-1] in list(conf):
@@ -176,6 +184,8 @@ class Xml:
         return {}
 
     def merge_defaults(self, path: list, conf: dict) -> dict:
+        """Return config dict with defaults non-destructively merged
+        """
         if not path:
             path = [next(iter(conf.keys()))]
         if path[-1] in list(conf):
