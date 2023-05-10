@@ -14,7 +14,6 @@
 # along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 from vyos.xml_ref import definition
-from vyos.base import Warning
 
 def load_reference(cache=[]):
     if cache:
@@ -27,7 +26,7 @@ def load_reference(cache=[]):
         xml.define(reference)
         cache.append(xml)
     except Exception:
-        Warning('no xml reference cache !!')
+        raise ImportError('no xml reference cache !!')
 
     return xml
 

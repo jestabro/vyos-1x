@@ -92,20 +92,17 @@ class Xml:
         d = self._get_ref_path(path)
         return self._is_leaf_node(d)
 
-    def multi_to_list(self, rpath: list, conf: dict) -> dict:
+    def multi_to_list(self, rpath: list, conf: dict):
         if rpath and rpath[-1] in list(conf):
             raise ValueError('rpath should be disjoint from conf keys')
 
-        res = copy.deepcopy(conf)
-        for k in list(res):
+        for k in list(conf):
             d = self._get_ref_path(rpath + [k])
             if self._is_leaf_node(d):
-                if self._is_multi_node(d) and not isinstance(res[k], list):
-                    res[k] = [res[k]]
+                if self._is_multi_node(d) and not isinstance(conf[k], list):
+                    conf[k] = [conf[k]]
             else:
-                self.multi_to_list(rpath + [k], res[k])
-
-        return res
+                self.multi_to_list(rpath + [k], conf[k])
 
     def _get_default_value(self, node: dict):
         return self._get_ref_node_data(node, "default_value")
