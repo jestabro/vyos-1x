@@ -27,7 +27,7 @@ from os.path import isdir
 _here = dirname(__file__)
 
 sys.path.append(join(_here, '..'))
-from configtree import reference_tree_to_json
+from configtree import reference_tree_to_json, ConfigTreeError
 
 xml_cache = abspath(join(_here, 'cache.py'))
 xml_tmp = '/tmp/xml_cache.json'
@@ -52,7 +52,11 @@ def main():
 
     xml_dir = abspath(args.xml_dir)
 
-    reference_tree_to_json(xml_dir, xml_tmp)
+    try:
+        reference_tree_to_json(xml_dir, xml_tmp)
+    except ConfigTreeError as e:
+        print(e)
+        sys.exit(1)
 
     with open(xml_tmp) as f:
         d = json.loads(f.read())
