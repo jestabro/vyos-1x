@@ -1,0 +1,14 @@
+
+type HostVersion {
+    result: Generic
+}
+
+type HostVersionResult {
+    data: HostVersion
+    success: Boolean!
+    errors: [String]
+}
+
+extend type Query {
+    HostVersion : HostVersionResult
+}

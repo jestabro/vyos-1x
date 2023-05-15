@@ -19,6 +19,7 @@ from . graphql.mutations import mutation
 from . graphql.directives import directives_dict
 from . graphql.errors import op_mode_error
 from . graphql.auth_token_mutation import auth_token_mutation
+from . graphql.host_version_query import host_version_query
 from . libs.token_auth import init_secret
 from . import state
 from ariadne import make_executable_schema, load_schema_from_path, snake_case_fallback_resolvers
@@ -31,6 +32,6 @@ def generate_schema():
 
     type_defs = load_schema_from_path(api_schema_dir)
 
-    schema = make_executable_schema(type_defs, query, op_mode_error, mutation, auth_token_mutation, snake_case_fallback_resolvers, directives=directives_dict)
+    schema = make_executable_schema(type_defs, query, op_mode_error, mutation, auth_token_mutation, host_version_query, snake_case_fallback_resolvers, directives=directives_dict)
 
     return schema

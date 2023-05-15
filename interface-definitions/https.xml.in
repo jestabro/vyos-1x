@@ -119,6 +119,12 @@
                       <valueless/>
                     </properties>
                   </leafNode>
+                  <leafNode name="expose-host-version">
+                    <properties>
+                      <help>Allow unauthenticated query of hostname and version</help>
+                      <valueless/>
+                    </properties>
+                  </leafNode>
                   <node name="authentication">
                     <properties>
                       <help>GraphQL authentication</help>

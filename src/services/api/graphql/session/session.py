@@ -51,6 +51,22 @@ def get_user_info(user):
 
     return user_info
 
+def get_host_version(full=False):
+    from vyos.util import rc_cmd
+    from vyos.version import get_version
+
+    r, hostname = rc_cmd('/bin/hostname')
+    if r:
+        hostname = ''
+    version = get_version()
+    if not full:
+        version = version.split('-')[0]
+    version = 'VyOS ' + version
+
+    host_version = {'hostname': hostname, 'version': version}
+
+    return host_version
+
 class Session:
     """
     Wrapper for calling configsession functions based on GraphQL requests.
