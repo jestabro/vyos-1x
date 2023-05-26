@@ -102,20 +102,38 @@ class Xml:
                 break
         return d
 
-    def _dict_find(self, d: dict, key: str, non_local=False) -> bool:
+    def _dict_find(self, d: dict, key: str, non_local=False) -> dict:
         for k in list(d):
             if k in ('node_data', 'component_version'):
                 continue
+            if not isinstance(d[k], dict):
+                continue
             if k == key:
-                return True
-            if non_local and isinstance(d[k], dict):
-                if self._dict_find(d[k], key):
-                    return True
-        return False
+                return d[k]
+            if non_local:
+                r = self._dict_find(d[k], key, non_local=True)
+                if r:
+                    return r
+        return {}
 
-    def cli_defined(self, path: list, node: str, non_local=False) -> bool:
+    def _dict_node_exists(self, d: dict, key: Union[str, list],
+                          non_local=False) -> bool:
+        if isinstance(key, str):
+            if not self._dict_find(d, key, non_local=non_local):
+                return False
+            return True
+        if isinstance(key, list):
+            for k in key:
+                d = self._dict_find(d, k, non_local=non_local)
+                if not d:
+                    return False
+            return True
+        raise TypeError('key must be of type str or list')
+
+    def cli_defined(self, path: list, node: Union[str, list],
+                    non_local=False) -> bool:
         d = self._dict_get(self.ref, path)
-        return self._dict_find(d, node, non_local=non_local)
+        return self._dict_node_exists(d, node, non_local=non_local)
 
     def component_version(self) -> dict:
         d = {}
