@@ -18,7 +18,8 @@ import sys
 import subprocess
 from typing import Tuple
 
-from vyos.config_mgmt import ConfigMgmt, ConfigMgmtError, DEFAULT_TIME_MINUTES
+from vyos.config_mgmt import ConfigMgmt, ConfigMgmtError
+from vyos.config_mgmt import unsaved_commits, DEFAULT_TIME_MINUTES
 from vyos.util import is_systemd_service_running
 from vyos.utils.dict import dict_to_paths
 
@@ -194,7 +195,11 @@ class ConfigSession(object):
     def discard(self):
         self.__run_command([DISCARD])
 
-    def commit_confirm(self, timeout: int=DEFAULT_TIME_MINUTES) -> Tuple[str,int]:
+    def commit_confirm(self, timeout: int=DEFAULT_TIME_MINUTES,
+                       force: bool = False) -> Tuple[str,int]:
+        if unsaved_commits() and not force:
+            out = 'There are unsaved commits: either save or set force=True'
+            return out, 1
         try:
             out, rc = self.config_mgmt.commit_confirm(minutes=timeout, no_prompt=True)
         except ConfigMgmtError as e:
