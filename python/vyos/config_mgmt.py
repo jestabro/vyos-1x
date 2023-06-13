@@ -186,11 +186,11 @@ Proceed ?'''
         _ = self._read_tmp_log_entry()
 
         # archived config will be reverted on boot
-        rc, out = rc_cmd('sudo systemctl reboot')
+        rc, out = rc_cmd('sleep 1; sudo systemctl reboot')
         if rc != 0:
             raise ConfigMgmtError(out)
 
-        return '', 0
+        return 'Rebooting to revert to saved config', 0
 
     def rollback(self, rev: int, no_prompt: bool=False) -> Tuple[str,int]:
         """Reboot to config revision 'rev'.
