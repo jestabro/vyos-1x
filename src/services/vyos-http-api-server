@@ -134,23 +134,24 @@ class ConfigSectionModel(ApiModel, BaseConfigSectionModel):
 class ConfigSectionListModel(ApiModel):
     commands: List[BaseConfigSectionModel]
 
-class TimeoutModel(BaseModel):
+class ConfirmDataModel(BaseModel):
     # allow coercion of types by not using StrictStr, to allow for int|str
     timeout: str = None
+    force: bool = False
 
-class ConfirmModel(BaseModel):
+class ConfirmOpModel(BaseModel):
     op: StrictStr
 
-class ConfigureConfirmModel(ConfigureModel, TimeoutModel):
+class ConfigureConfirmModel(ConfigureModel, ConfirmDataModel):
     pass
 
-class ConfigureListConfirmModel(ConfigureListModel, TimeoutModel):
+class ConfigureListConfirmModel(ConfigureListModel, ConfirmDataModel):
     pass
 
-class ConfigSectionConfirmModel(ConfigSectionModel, TimeoutModel):
+class ConfigSectionConfirmModel(ConfigSectionModel, ConfirmDataModel):
     pass
 
-class ConfigSectionListConfirmModel(ConfigSectionListModel, TimeoutModel):
+class ConfigSectionListConfirmModel(ConfigSectionListModel, ConfirmDataModel):
     pass
 
 class RetrieveModel(ApiModel):
@@ -438,7 +439,7 @@ def _configure_op(data: Any,
     endpoint = request.url.path
 
     timeout = None
-    if isinstance(data, TimeoutModel):
+    if isinstance(data, ConfirmDataModel):
         timeout = data.timeout
 
     # Allow users to pass just one command
@@ -543,7 +544,7 @@ async def configure_confirm_op(data: Union[ConfigureConfirmModel,
                                            ConfigureListConfirmModel,
                                            ConfigSectionConfirmModel,
                                            ConfigSectionListConfirmModel,
-                                           ConfirmModel],
+                                           ConfirmOpModel],
                                request: Request):
     if isinstance(data, (ConfigureConfirmModel, ConfigureListConfirmModel,
                          ConfigSectionConfirmModel,
