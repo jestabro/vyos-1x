@@ -16,7 +16,9 @@ import os
 import re
 import sys
 import subprocess
+from typing import Tuple
 
+from vyos.config_mgmt import ConfigMgmt, ConfigMgmtError, DEFAULT_TIME_MINUTES
 from vyos.util import is_systemd_service_running
 from vyos.utils.dict import dict_to_paths
 
@@ -121,6 +123,7 @@ class ConfigSession(object):
         self.__session_env["COMMIT_VIA"] = app
 
         self.__run_command([CLI_SHELL_API, 'setupSession'])
+        self.config_mgmt = ConfigMgmt(session_env=session_env)
 
     def __del__(self):
         try:
@@ -141,6 +144,12 @@ class ConfigSession(object):
 
     def get_session_env(self):
         return self.__session_env
+
+    def set_session_env(self, key, value):
+        self.__session_env[key] = value
+
+    def unset_session_env(self, key):
+        del self.__session_env[key]
 
     def set(self, path, value=None):
         if not value:
@@ -184,6 +193,41 @@ class ConfigSession(object):
 
     def discard(self):
         self.__run_command([DISCARD])
+
+    def commit_confirm(self, timeout: int=DEFAULT_TIME_MINUTES) -> Tuple[str,int]:
+        try:
+            out, rc = self.config_mgmt.commit_confirm(minutes=timeout, no_prompt=True)
+        except ConfigMgmtError as e:
+            return str(e), 1
+
+        if rc == 0:
+            self.set_session_env('IN_COMMIT_CONFIRM', 't')
+            try:
+                commit_out = self.commit()
+            except ConfigSessionError as e:
+                rc = 1
+                commit_out = str(e)
+            self.unset_session_env('IN_COMMIT_CONFIRM')
+            if commit_out:
+                out = commit_out + '\n' + out
+
+        return out, rc
+
+    def confirm(self) -> Tuple[str,int]:
+        try:
+            out, rc = self.config_mgmt.confirm()
+        except ConfigMgmtError as e:
+            return str(e), 1
+
+        return out, rc
+
+    def revert(self) -> Tuple[str,int]:
+        try:
+            out, rc = self.config_mgmt.revert()
+        except ConfigMgmtError as e:
+            return str(e), 1
+
+        return out, rc
 
     def show_config(self, path, format='raw'):
         config_data = self.__run_command(SHOW_CONFIG + path)
