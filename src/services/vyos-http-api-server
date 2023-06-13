@@ -135,7 +135,8 @@ class ConfigSectionListModel(ApiModel):
     commands: List[BaseConfigSectionModel]
 
 class TimeoutModel(BaseModel):
-    timeout: Optional[str] = None
+    # allow coercion of types by not using StrictStr, to allow for int|str
+    timeout: str = None
 
 class ConfirmModel(BaseModel):
     op: StrictStr
@@ -441,7 +442,9 @@ def _configure_op(data: Any,
         timeout = data.timeout
 
     # Allow users to pass just one command
-    if not isinstance(data, (ConfigureListModel, ConfigSectionListModel)):
+    if not isinstance(data, (ConfigureListModel, ConfigSectionListModel,
+                             ConfigureListConfirmModel,
+                             ConfigSectionListConfirmModel)):
         data = [data]
     else:
         data = data.commands
@@ -491,7 +494,7 @@ def _configure_op(data: Any,
                 else:
                     raise ConfigSessionError(f"'{op}' is not a valid operation")
         # end for
-        if endpoint not in ('/configure-confirm'):
+        if endpoint != '/configure-confirm':
             session.commit()
         else:
             if timeout is not None:
@@ -536,7 +539,7 @@ async def configure_section_op(data: Union[ConfigSectionModel,
     return _configure_op(data, request)
 
 @app.post('/configure-confirm')
-async def configure_confirm_op(date: Union[ConfigureConfirmModel,
+async def configure_confirm_op(data: Union[ConfigureConfirmModel,
                                            ConfigureListConfirmModel,
                                            ConfigSectionConfirmModel,
                                            ConfigSectionListConfirmModel,
