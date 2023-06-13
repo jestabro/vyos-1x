@@ -24,7 +24,7 @@ import json
 import logging
 import traceback
 import threading
-from typing import List, Union, Callable, Dict
+from typing import List, Union, Callable, Dict, Any, Optional
 
 import uvicorn
 from fastapi import FastAPI, Depends, Request, Response, HTTPException
@@ -133,6 +133,24 @@ class ConfigSectionModel(ApiModel, BaseConfigSectionModel):
 
 class ConfigSectionListModel(ApiModel):
     commands: List[BaseConfigSectionModel]
+
+class TimeoutModel(BaseModel):
+    timeout: Optional[str] = None
+
+class ConfirmModel(BaseModel):
+    op: StrictStr
+
+class ConfigureConfirmModel(ConfigureModel, TimeoutModel):
+    pass
+
+class ConfigureListConfirmModel(ConfigureListModel, TimeoutModel):
+    pass
+
+class ConfigSectionConfirmModel(ConfigSectionModel, TimeoutModel):
+    pass
+
+class ConfigSectionListConfirmModel(ConfigSectionListModel, TimeoutModel):
+    pass
 
 class RetrieveModel(ApiModel):
     op: StrictStr
@@ -410,14 +428,17 @@ app.router.route_class = MultipartRoute
 async def validation_exception_handler(request, exc):
     return error(400, str(exc.errors()[0]))
 
-def _configure_op(data: Union[ConfigureModel, ConfigureListModel,
-                              ConfigSectionModel, ConfigSectionListModel],
+def _configure_op(data: Any,
                   request: Request):
     session = app.state.vyos_session
     env = session.get_session_env()
     config = vyos.config.Config(session_env=env)
 
     endpoint = request.url.path
+
+    timeout = None
+    if isinstance(data, TimeoutModel):
+        timeout = data.timeout
 
     # Allow users to pass just one command
     if not isinstance(data, (ConfigureListModel, ConfigSectionListModel)):
@@ -470,7 +491,16 @@ def _configure_op(data: Union[ConfigureModel, ConfigureListModel,
                 else:
                     raise ConfigSessionError(f"'{op}' is not a valid operation")
         # end for
-        session.commit()
+        if endpoint not in ('/configure-confirm'):
+            session.commit()
+        else:
+            if timeout is not None:
+                msg, rc = session.commit_confirm(timeout=timeout)
+            else:
+                msg, rc = session.commit_confirm()
+            if rc != 0:
+                raise ConfigSessionError(msg)
+            session.commit_confirm()
         logger.info(f"Configuration modified via HTTP API using key '{app.state.vyos_id}'")
     except ConfigSessionError as e:
         session.discard()
@@ -504,6 +534,32 @@ async def configure_section_op(data: Union[ConfigSectionModel,
                                            ConfigSectionListModel],
                                request: Request):
     return _configure_op(data, request)
+
+@app.post('/configure-confirm')
+async def configure_confirm_op(date: Union[ConfigureConfirmModel,
+                                           ConfigureListConfirmModel,
+                                           ConfigSectionConfirmModel,
+                                           ConfigSectionListConfirmModel,
+                                           ConfirmModel],
+                               request: Request):
+    if isinstance(data, (ConfigureConfirmModel, ConfigureListConfirmModel,
+                         ConfigSectionConfirmModel,
+                         ConfigSectionListConfirmModel)):
+        return _configure_op(data, request)
+
+    session = app.state.vyos_session
+    op = data.op
+
+    if op == 'confirm':
+        out, rc = session.confirm()
+    elif op == 'revert':
+        out, rc = session.revert()
+    else:
+        out, rc = (f"'{op}' is not a valid operation", 1)
+
+    if rc != 0:
+        return error(400, out)
+    return success(out)
 
 @app.post("/retrieve")
 async def retrieve_op(data: RetrieveModel):
