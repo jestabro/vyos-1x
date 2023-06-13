@@ -172,7 +172,8 @@ Proceed ?'''
             raise ConfigMgmtError(out)
 
         entry = self._read_tmp_log_entry()
-        self._add_log_entry(**entry)
+        if entry is not None:
+            self._add_log_entry(**entry)
 
         if self._archive_active_config():
             self._update_archive()
@@ -577,7 +578,7 @@ Proceed ?'''
                 entry = f.read()
             os.unlink(tmp_log_entry)
         except OSError as e:
-            logger.critical(f'error on file {tmp_log_entry}: {e}')
+            return None
 
         return self._get_log_entry(entry)
 
