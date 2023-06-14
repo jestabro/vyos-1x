@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interfaceDefinition>
+  <node name="service">
+    <children>
+      <node name="config-sync" owner="${vyos_conf_scripts_dir}/service_config_sync.py">
+        <properties>
+          <help>Configuration synchronization</help>
+        </properties>
+        <children>
+          <node name="primary">
+            <properties>
+              <help>Primary server parameters</help>
+            </properties>
+            <children>
+              <leafNode name="address">
+                <properties>
+                  <help>IP address</help>
+                  <valueHelp>
+                    <format>ipv4</format>
+                    <description>IPv4 address to match</description>
+                  </valueHelp>
+                  <constraint>
+                    <validator name="ipv4-address"/>
+                  </constraint>
+                </properties>
+              </leafNode>
+              <leafNode name="key">
+                <properties>
+                  <help>HTTP API key</help>
+                </properties>
+              </leafNode>
+            </children>
+          </node>
+          <node name="secondary">
+            <properties>
+              <help>Secondary server parameters</help>
+            </properties>
+            <children>
+              <leafNode name="address">
+                <properties>
+                  <help>IP address</help>
+                  <valueHelp>
+                    <format>ipv4</format>
+                    <description>IPv4 address to match</description>
+                  </valueHelp>
+                  <constraint>
+                    <validator name="ipv4-address"/>
+                  </constraint>
+                </properties>
+              </leafNode>
+              <leafNode name="key">
+                <properties>
+                  <help>HTTP API key</help>
+                </properties>
+              </leafNode>
+            </children>
+          </node>
+          <leafNode name="mode">
+            <properties>
+              <help>Synchronization mode</help>
+              <completionHelp>
+                <list>load set</list>
+              </completionHelp>
+              <valueHelp>
+                <format>load</format>
+                <description>Load and replace configuartion setction</description>
+              </valueHelp>
+              <valueHelp>
+                <format>set</format>
+                <description>Set configuration section</description>
+              </valueHelp>
+              <constraint>
+                <regex>(load|set)</regex>
+              </constraint>
+            </properties>
+          </leafNode>
+          <leafNode name="section">
+            <properties>
+              <help>section_help</help>
+              <completionHelp>
+                <list>nat nat66 firewall</list>
+              </completionHelp>
+              <valueHelp>
+                <format>nat</format>
+                <description>NAT</description>
+              </valueHelp>
+              <valueHelp>
+                <format>nat66</format>
+                <description>NAT66</description>
+              </valueHelp>
+              <valueHelp>
+                <format>firewall</format>
+                <description>firewall</description>
+              </valueHelp>
+              <constraint>
+                <regex>(nat|nat66|firewall)</regex>
+              </constraint>
+              <multi/>
+            </properties>
+          </leafNode>
+        </children>
+      </node>
+    </children>
+  </node>
+</interfaceDefinition>
