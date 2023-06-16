@@ -139,12 +139,18 @@ def set_remote_config(
         logger.error(f"An error occurred: {e}")
         return None
 
+def is_section_revised(section: str) -> bool:
+    from vyos.config_mgmt import is_node_revised
+    return is_node_revised([section])
 
 def config_sync(primary_address: str, primary_key: str, secondary_address: str,
                 secondary_key: str, sections: List[str], mode: str):
     """Retrieve a config section from primary router in JSON format and send it to
        secondary router
     """
+
+    if not any(map(is_section_revised, sections)):
+        return
 
     logger.info(
         f"Config synchronization: Mode={mode}, Primary={primary_address}, Secondary={secondary_address}"
