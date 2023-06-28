@@ -435,11 +435,12 @@ class DiffTree:
         self.add = self.full.get_subtree(['add'])
         self.sub = self.full.get_subtree(['sub'])
         self.inter = self.full.get_subtree(['inter'])
+        self.delete = self.full.get_subtree(['del'])
 
         # trim sub(-tract) tree to get delete tree for commands
         ref = self.right.get_subtree(path, with_node=True) if path else self.right
         res = self.__trim_tree(self.sub._get_config(), ref._get_config())
-        self.delete = ConfigTree(address=res)
+        self.deprecated_delete = ConfigTree(address=res)
 
     def to_commands(self):
         add = self.add.to_commands()
