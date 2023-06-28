@@ -68,3 +68,13 @@ class TestConfigDiff(TestCase):
                          self.config_right.to_string(ordered_values=True))
         self.assertEqual(l_union.to_string(),
                          self.config_left.to_string(ordered_values=True))
+
+    def test_deprecated(self):
+        lr_diff = vyos.configtree.DiffTree(self.config_left,
+                                           self.config_right)
+
+        delete = lr_diff.delete
+        deprecated_delete = lr_diff.deprecated_delete
+
+        self.assertEqual(delete.to_string(),
+                         deprecated_delete.to_string())
