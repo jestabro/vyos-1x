@@ -396,7 +396,7 @@ def reference_tree_to_json(from_dir, to_file, libpath=LIBPATH):
         raise ConfigTreeError(msg)
 
 class DiffTree:
-    def __init__(self, left, right, path=[], libpath=LIBPATH):
+    def __init__(self, left, right, path=[], libpath=LIBPATH, immut=False):
         if left is None:
             left = ConfigTree(config_string='\n')
         if right is None:
@@ -414,7 +414,10 @@ class DiffTree:
 
         self.__lib = cdll.LoadLibrary(libpath)
 
-        self.__diff_tree = self.__lib.diff_tree
+        if immut:
+            self.__diff_tree = self.__lib.diff_tree_immut
+        else:
+            self.__diff_tree = self.__lib.diff_tree
         self.__diff_tree.argtypes = [c_char_p, c_void_p, c_void_p]
         self.__diff_tree.restype = c_void_p
 
