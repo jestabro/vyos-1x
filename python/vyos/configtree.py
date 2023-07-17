@@ -331,7 +331,8 @@ class ConfigTree(object):
         subt = ConfigTree(address=res)
         return subt
 
-def show_diff(left, right, path=[], commands=False, libpath=LIBPATH):
+def show_diff(left, right, path=[], commands=False, libpath=LIBPATH,
+              immut=False):
     if left is None:
         left = ConfigTree(config_string='\n')
     if right is None:
@@ -346,7 +347,10 @@ def show_diff(left, right, path=[], commands=False, libpath=LIBPATH):
     path_str = " ".join(map(str, path)).encode()
 
     __lib = cdll.LoadLibrary(libpath)
-    __show_diff = __lib.show_diff
+    if immut:
+        __show_diff = __lib.show_diff_immut
+    else:
+        __show_diff = __lib.show_diff
     __show_diff.argtypes = [c_bool, c_char_p, c_void_p, c_void_p]
     __show_diff.restype = c_char_p
     __get_error = __lib.get_error
