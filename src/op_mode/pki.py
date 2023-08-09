@@ -76,12 +76,12 @@ def get_config_certificate(name=None):
     # Get certificates from config
     base = ['pki', 'certificate']
     if not conf.exists(base):
-        return False
+        return None
 
     if name:
         base = base + [name]
         if not conf.exists(base + ['private', 'key']) or not conf.exists(base + ['certificate']):
-            return False
+            return None
 
     return conf.get_config_dict(base, key_mangling=('-', '_'),
                                 get_first_key=True,
@@ -98,7 +98,7 @@ def get_certificate_ca(cert, ca_certs):
 
         ca_cert = load_certificate(ca_dict['certificate'])
 
-        if not ca_cert:
+        if ca_cert is None:
             continue
 
         if verify_certificate(cert, ca_cert):
@@ -131,13 +131,13 @@ def get_revoked_by_serial_numbers(serial_numbers=[]):
     certs_out = []
     certs = get_config_certificate()
     ca_certs = get_config_ca_certificate()
-    if certs:
+    if certs is not None:
         for cert_name, cert_dict in certs.items():
             if 'certificate' not in cert_dict:
                 continue
 
             cert = load_certificate(cert_dict['certificate'])
-            if cert.serial_number in serial_numbers:
+            if cert is not None and cert.serial_number in serial_numbers:
                 certs_out.append(cert_name)
     if ca_certs:
         for cert_name, cert_dict in ca_certs.items():
@@ -145,7 +145,7 @@ def get_revoked_by_serial_numbers(serial_numbers=[]):
                 continue
 
             cert = load_certificate(cert_dict['certificate'])
-            if cert.serial_number in serial_numbers:
+            if cert is not None and cert.serial_number in serial_numbers:
                 certs_out.append(cert_name)
     return certs_out
 
@@ -381,7 +381,7 @@ def generate_ca_certificate_sign(name, ca_name, install=False, file=False):
 
     ca_cert = load_certificate(ca_dict['certificate'])
 
-    if not ca_cert:
+    if ca_cert is None:
         print("Failed to load signing CA certificate, aborting")
         return None
 
@@ -391,7 +391,7 @@ def generate_ca_certificate_sign(name, ca_name, install=False, file=False):
         ca_private_passphrase = ask_input('Enter signing CA private key passphrase:')
     ca_private_key = load_private_key(ca_private['key'], passphrase=ca_private_passphrase)
 
-    if not ca_private_key:
+    if ca_private_key is None:
         print("Failed to load signing CA private key, aborting")
         return None
 
@@ -419,7 +419,7 @@ def generate_ca_certificate_sign(name, ca_name, install=False, file=False):
         wrap = lines[0].find('-----') < 0 # Only base64 pasted, add the CSR tags for parsing
         cert_req = load_certificate_request("\n".join(lines), wrap)
 
-    if not cert_req:
+    if cert_req is None:
         print("Invalid certificate request")
         return None
 
@@ -447,7 +447,7 @@ def generate_certificate_sign(name, ca_name, install=False, file=False):
 
     ca_cert = load_certificate(ca_dict['certificate'])
 
-    if not ca_cert:
+    if ca_cert is None:
         print("Failed to load CA certificate, aborting")
         return None
 
@@ -457,7 +457,7 @@ def generate_certificate_sign(name, ca_name, install=False, file=False):
         ca_private_passphrase = ask_input('Enter CA private key passphrase:')
     ca_private_key = load_private_key(ca_private['key'], passphrase=ca_private_passphrase)
 
-    if not ca_private_key:
+    if ca_private_key is None:
         print("Failed to load CA private key, aborting")
         return None
 
@@ -485,7 +485,7 @@ def generate_certificate_sign(name, ca_name, install=False, file=False):
         wrap = lines[0].find('-----') < 0 # Only base64 pasted, add the CSR tags for parsing
         cert_req = load_certificate_request("\n".join(lines), wrap)
 
-    if not cert_req:
+    if cert_req is None:
         print("Invalid certificate request")
         return None
 
@@ -531,7 +531,7 @@ def generate_certificate_revocation_list(ca_name, install=False, file=False):
 
     ca_cert = load_certificate(ca_dict['certificate'])
 
-    if not ca_cert:
+    if ca_cert is None:
         print("Failed to load CA certificate, aborting")
         return None
 
@@ -541,7 +541,7 @@ def generate_certificate_revocation_list(ca_name, install=False, file=False):
         ca_private_passphrase = ask_input('Enter CA private key passphrase:')
     ca_private_key = load_private_key(ca_private['key'], passphrase=ca_private_passphrase)
 
-    if not ca_private_key:
+    if ca_private_key is None:
         print("Failed to load CA private key, aborting")
         return None
 
@@ -553,14 +553,10 @@ def generate_certificate_revocation_list(ca_name, install=False, file=False):
             continue
 
         cert_data = cert_dict['certificate']
+        cert = load_certificate(cert_data)
 
-        try:
-            cert = load_certificate(cert_data)
-
-            if cert.issuer == ca_cert.subject:
-                to_revoke.append(cert.serial_number)
-        except ValueError:
-            continue
+        if cert is not None and cert.issuer == ca_cert.subject:
+            to_revoke.append(cert.serial_number)
 
     if not to_revoke:
         print("No revoked certificates to add to the CRL")
@@ -568,7 +564,7 @@ def generate_certificate_revocation_list(ca_name, install=False, file=False):
 
     crl = create_certificate_revocation_list(ca_cert, ca_private_key, to_revoke)
 
-    if not crl:
+    if crl is None:
         print("Failed to create CRL")
         return None
 
@@ -606,7 +602,7 @@ def generate_dh_parameters(name, install=False, file=False):
     print("Generating parameters...")
 
     dh_params = create_dh_parameters(bits)
-    if not dh_params:
+    if dh_params is None:
         print("Failed to create DH parameters")
         return None
 
@@ -693,7 +689,7 @@ def import_ca_certificate(name, path=None, key_path=None):
             cert_data = f.read()
             cert = load_certificate(cert_data, wrap_tags=False)
 
-        if not cert:
+        if cert is None:
             print(f'Invalid certificate: {path}')
             return
 
@@ -711,7 +707,7 @@ def import_ca_certificate(name, path=None, key_path=None):
             key_data = f.read()
             key = load_private_key(key_data, passphrase=passphrase, wrap_tags=False)
 
-        if not key:
+        if key is None:
             print(f'Invalid private key or passphrase: {path}')
             return
 
@@ -729,7 +725,7 @@ def import_certificate(name, path=None, key_path=None):
             cert_data = f.read()
             cert = load_certificate(cert_data, wrap_tags=False)
 
-        if not cert:
+        if cert is None:
             print(f'Invalid certificate: {path}')
             return
 
@@ -747,7 +743,7 @@ def import_certificate(name, path=None, key_path=None):
             key_data = f.read()
             key = load_private_key(key_data, passphrase=passphrase, wrap_tags=False)
 
-        if not key:
+        if key is None:
             print(f'Invalid private key or passphrase: {path}')
             return
 
@@ -764,7 +760,7 @@ def import_crl(name, path):
         crl_data = f.read()
         crl = load_crl(crl_data, wrap_tags=False)
 
-    if not crl:
+    if crl is None:
         print(f'Invalid certificate: {path}')
         return
 
@@ -781,7 +777,7 @@ def import_dh_parameters(name, path):
         dh_data = f.read()
         dh = load_dh_parameters(dh_data, wrap_tags=False)
 
-    if not dh:
+    if dh is None:
         print(f'Invalid DH parameters: {path}')
         return
 
@@ -799,7 +795,7 @@ def import_keypair(name, path=None, key_path=None):
             key_data = f.read()
             key = load_public_key(key_data, wrap_tags=False)
 
-        if not key:
+        if key is None:
             print(f'Invalid public key: {path}')
             return
 
@@ -817,7 +813,7 @@ def import_keypair(name, path=None, key_path=None):
             key_data = f.read()
             key = load_private_key(key_data, passphrase=passphrase, wrap_tags=False)
 
-        if not key:
+        if key is None:
             print(f'Invalid private key or passphrase: {path}')
             return
 
@@ -878,7 +874,7 @@ def show_certificate(name=None, pem=False):
     headers = ['Name', 'Type', 'Subject CN', 'Issuer CN', 'Issued', 'Expiry', 'Revoked', 'Private Key', 'CA Present']
     data = []
     certs = get_config_certificate()
-    if certs:
+    if certs is not None:
         ca_certs = get_config_ca_certificate()
 
         for cert_name, cert_dict in certs.items():
@@ -889,7 +885,7 @@ def show_certificate(name=None, pem=False):
 
             cert = load_certificate(cert_dict['certificate'])
 
-            if not cert:
+            if cert is None:
                 continue
 
             if name and pem:
@@ -941,7 +937,7 @@ def show_crl(name=None, pem=False):
             for crl_data in cert_dict['crl']:
                 crl = load_crl(crl_data)
 
-                if not crl:
+                if crl is None:
                     continue
 
                 if name and pem:

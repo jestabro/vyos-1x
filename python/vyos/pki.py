@@ -198,7 +198,7 @@ def create_certificate(cert_req, ca_cert, ca_private_key, valid_days=365, cert_t
 
 def create_certificate_revocation_list(ca_cert, ca_private_key, serial_numbers=[]):
     if not serial_numbers:
-        return False
+        return None
 
     builder = x509.CertificateRevocationListBuilder() \
         .issuer_name(ca_cert.subject) \
@@ -217,7 +217,7 @@ def create_certificate_revocation_list(ca_cert, ca_private_key, serial_numbers=[
 def create_dh_parameters(bits=2048):
     if not bits or bits < 512:
         print("Invalid DH parameter key size")
-        return False
+        return None
 
     return dh.generate_parameters(generator=2, key_size=int(bits))
 
@@ -253,7 +253,7 @@ def load_public_key(raw_data, wrap_tags=True):
     try:
         return serialization.load_pem_public_key(bytes(raw_data, 'utf-8'))
     except ValueError:
-        return False
+        return None
 
 def load_private_key(raw_data, passphrase=None, wrap_tags=True):
     if wrap_tags:
@@ -265,7 +265,7 @@ def load_private_key(raw_data, passphrase=None, wrap_tags=True):
     try:
         return serialization.load_pem_private_key(bytes(raw_data, 'utf-8'), password=passphrase)
     except ValueError:
-        return False
+        return None
 
 def load_certificate_request(raw_data, wrap_tags=True):
     if wrap_tags:
@@ -274,7 +274,7 @@ def load_certificate_request(raw_data, wrap_tags=True):
     try:
         return x509.load_pem_x509_csr(bytes(raw_data, 'utf-8'))
     except ValueError:
-        return False
+        return None
 
 def load_certificate(raw_data, wrap_tags=True):
     if wrap_tags:
@@ -283,7 +283,7 @@ def load_certificate(raw_data, wrap_tags=True):
     try:
         return x509.load_pem_x509_certificate(bytes(raw_data, 'utf-8'))
     except ValueError:
-        return False
+        return None
 
 def load_crl(raw_data, wrap_tags=True):
     if wrap_tags:
@@ -292,7 +292,7 @@ def load_crl(raw_data, wrap_tags=True):
     try:
         return x509.load_pem_x509_crl(bytes(raw_data, 'utf-8'))
     except ValueError:
-        return False
+        return None
 
 def load_dh_parameters(raw_data, wrap_tags=True):
     if wrap_tags:
@@ -301,21 +301,24 @@ def load_dh_parameters(raw_data, wrap_tags=True):
     try:
         return serialization.load_pem_parameters(bytes(raw_data, 'utf-8'))
     except ValueError:
-        return False
+        return None
 
 # Verify
 
 def is_ca_certificate(cert):
-    if not cert:
+    if cert is None:
         return False
 
     try:
-        ext = cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
-        return ext.value.ca
+        cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
     except ExtensionNotFound:
         return False
 
+    return True
+
 def verify_certificate(cert, ca_cert):
+    if cert is None or ca_cert is None:
+        return False
     # Verify certificate was signed by specified CA
     if ca_cert.subject != cert.issuer:
         return False
@@ -345,6 +348,8 @@ def verify_certificate(cert, ca_cert):
         return False
 
 def verify_crl(crl, ca_cert):
+    if crl is None or ca_cert is None:
+        return False
     # Verify CRL was signed by specified CA
     if ca_cert.subject != crl.issuer:
         return False

@@ -156,33 +156,33 @@ def get_config(config=None):
 
 def is_valid_certificate(raw_data):
     # If it loads correctly we're good, or return False
-    return load_certificate(raw_data, wrap_tags=True)
+    return bool(load_certificate(raw_data, wrap_tags=True))
 
 def is_valid_ca_certificate(raw_data):
     # Check if this is a valid certificate with CA attributes
     cert = load_certificate(raw_data, wrap_tags=True)
-    if not cert:
+    if cert is None:
         return False
     return is_ca_certificate(cert)
 
 def is_valid_public_key(raw_data):
     # If it loads correctly we're good, or return False
-    return load_public_key(raw_data, wrap_tags=True)
+    return bool(load_public_key(raw_data, wrap_tags=True))
 
 def is_valid_private_key(raw_data, protected=False):
     # If it loads correctly we're good, or return False
     # With encrypted private keys, we always return true as we cannot ask for password to verify
     if protected:
         return True
-    return load_private_key(raw_data, passphrase=None, wrap_tags=True)
+    return bool(load_private_key(raw_data, passphrase=None, wrap_tags=True))
 
 def is_valid_crl(raw_data):
     # If it loads correctly we're good, or return False
-    return load_crl(raw_data, wrap_tags=True)
+    return bool(load_crl(raw_data, wrap_tags=True))
 
 def is_valid_dh_parameters(raw_data):
     # If it loads correctly we're good, or return False
-    return load_dh_parameters(raw_data, wrap_tags=True)
+    return bool(load_dh_parameters(raw_data, wrap_tags=True))
 
 def verify(pki):
     if not pki:
