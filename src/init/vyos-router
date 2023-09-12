@@ -320,13 +320,6 @@ clear_or_override_config_files ()
     done
 }
 
-update_interface_config ()
-{
-    if [ -d /run/udev/vyos ]; then
-        $vyos_libexec_dir/vyos-interface-rescan.py $BOOTFILE
-    fi
-}
-
 cleanup_post_commit_hooks () {
     # Remove links from the post-commit hooks directory.
     # note that this approach only supports hooks that are "configured",
@@ -561,8 +554,6 @@ start ()
     run_preconfig_script
 
     run_postupgrade_script
-
-    update_interface_config || overall_status=1
 
     disabled system_config || system_config || overall_status=1
 
