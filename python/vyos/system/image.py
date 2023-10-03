@@ -1,4 +1,4 @@
-# Copyright 2022 VyOS maintainers and contributors <maintainers@vyos.io>
+# Copyright 2023 VyOS maintainers and contributors <maintainers@vyos.io>
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -28,12 +28,14 @@ CFG_VYOS_VARS: str = f'{GRUB_DIR_VYOS}/20-vyos-defaults-autoload.cfg'
 GRUB_DIR_VYOS_VERS: str = f'{GRUB_DIR_VYOS}/vyos-versions'
 # prepare regexes
 REGEX_KERNEL_CMDLINE: str = r'^BOOT_IMAGE=/(?P<boot_type>boot|live)/((?P<image_version>.+)/)?vmlinuz.*$'
+REGEX_MOD_CFG_VER: str = r'(\r\n|\r|\n)MOD_CFG_VER\s*=\s*(?P<cfg_ver>\d+)(\r\n|\r|\n)'
 
 
 # structures definitions
 class ImageDetails(TypedDict):
     name: str
     version: str
+    module_version: int
     disk_ro: int
     disk_rw: int
     disk_total: int
@@ -59,7 +61,7 @@ def bootmode_detect() -> str:
         return 'bios'
 
 
-def get_version(image_name: str, root_dir: str) -> str:
+def get_image_version(image_name: str, root_dir: str) -> str:
     """Extract version name from rootfs based on image name
 
     Args:
@@ -81,6 +83,57 @@ def get_version(image_name: str, root_dir: str) -> str:
     return version_name
 
 
+def get_image_tools_version(image_name: str, root_dir: str) -> int:
+    """Extract image-tools version from rootfs based on image name
+
+    Args:
+        image_name (str): a name of image (from boot menu)
+        root_dir (str): a root directory of persistence storage
+
+    Returns:
+        str: image-tools version
+    """
+    squashfs_file: str = next(
+        Path(f'{root_dir}/boot/{image_name}').glob('*.squashfs')).as_posix()
+    with TemporaryDirectory() as squashfs_mounted:
+        disk.partition_mount(squashfs_file, squashfs_mounted, 'squashfs')
+        try:
+            version_file: str = Path(
+                f'{squashfs_mounted}/usr/lib/python3/dist-packages/vyos/system/__init__.py').read_text()
+        except FileNotFoundError:
+            cfg_version_number: int = 0
+            return cfg_version_number
+        finally:
+            disk.partition_umount(squashfs_file)
+        cfg_version_result = re_compile(REGEX_MOD_CFG_VER).search(version_file)
+        cfg_version_number: int = int(cfg_version_result.groupdict().get('cfg_ver', 0))
+
+    return cfg_version_number
+
+def get_versions(image_name: str, root_dir: str = '') -> dict[str, str]:
+    """Return versions of image and image-tools
+
+    Args:
+        image_name (str): a name of an image
+        root_dir (str, optional): an optional path to the root directory.
+        Defaults to ''.
+
+    Returns:
+        dict[str, str]: a dictionary with versions of image and image-tools
+    """
+    if not root_dir:
+        root_dir = disk.find_persistence()
+
+    image_version: str = get_image_version(image_name, root_dir)
+    image_tools_version: int = get_image_tools_version(image_name, root_dir)
+
+    versions: dict[str, int] = {
+        'image': image_version,
+        'image-tools': image_tools_version
+    }
+
+    return versions
+
 def get_details(image_name: str, root_dir: str = '') -> ImageDetails:
     """Return information about image
 
@@ -95,7 +148,9 @@ def get_details(image_name: str, root_dir: str = '') -> ImageDetails:
     if not root_dir:
         root_dir = disk.find_persistence()
 
-    image_version: str = get_version(image_name, root_dir)
+    versions = get_versions(image_name, root_dir)
+    image_version: str = versions.get('image', '')
+    image_tools_version: int = versions.get('image-tools', 0)
 
     image_path: Path = Path(f'{root_dir}/boot/{image_name}')
     image_path_rw: Path = Path(f'{root_dir}/boot/{image_name}/rw')
@@ -113,12 +168,27 @@ def get_details(image_name: str, root_dir: str = '') -> ImageDetails:
     image_details: ImageDetails = {
         'name': image_name,
         'version': image_version,
+        'module_version': image_tools_version,
         'disk_ro': image_disk_ro,
         'disk_rw': image_disk_rw,
         'disk_total': image_disk_ro + image_disk_rw
     }
 
     return image_details
+
+
+def get_images_details() -> list[ImageDetails]:
+    """Return information about all images
+
+    Returns:
+        list[ImageDetails]: a list of dictionaries with details about images
+    """
+    images: list[str] = grub.version_list()
+    images_details: list[ImageDetails] = list()
+    for image_name in images:
+        images_details.append(get_details(image_name))
+
+    return images_details
 
 
 def get_running_image() -> str:

@@ -14,3 +14,5 @@
 # License along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 __all_: list[str] = ['disk', 'grub', 'image']
+# define image-tools module version
+MOD_CFG_VER = 1

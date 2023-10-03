@@ -28,7 +28,7 @@ from psutil import disk_partitions
 
 from vyos.configtree import ConfigTree
 from vyos.remote import download
-from vyos.system import disk, grub, image
+from vyos.system import disk, grub, image, compat
 from vyos.template import render
 from vyos.utils.io import ask_input, ask_yes_no
 from vyos.utils.file import chmod_2775
@@ -538,6 +538,9 @@ def add_image(image_path: str) -> None:
         cleanup([str(iso_path)])
         exit(f'Whooops: {err}')
 
+    # if compatibility mode, update GRUB menu entries
+    if compat.in_compat_mode():
+        compat.render_grub_cfg(f'{root_dir}/{grub.GRUB_CFG_MAIN}')
 
 def parse_arguments() -> Namespace:
     """Parse arguments

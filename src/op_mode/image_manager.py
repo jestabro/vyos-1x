@@ -22,7 +22,7 @@ from pathlib import Path
 from shutil import rmtree
 from sys import exit
 
-from vyos.system import disk, grub, image
+from vyos.system import disk, grub, image, compat
 from vyos.utils.io import ask_yes_no
 
 
@@ -56,6 +56,9 @@ def delete_image(image_name: str) -> None:
     except Exception as err:
         exit(f'Unable to remove the image "{image_name}": {err}')
 
+    # if compatibility mode, update GRUB menu entries
+    if compat.in_compat_mode():
+        compat.render_grub_cfg(f'{root_dir}/{grub.GRUB_CFG_MAIN}')
 
 def set_image(image_name: str) -> None:
     """Set default boot image
