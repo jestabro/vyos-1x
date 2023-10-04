@@ -58,3 +58,12 @@ def wait_for_commit_lock():
     # Very synchronous approach to multiprocessing
     while commit_in_progress():
         sleep(1)
+
+def in_commit():
+    """ A quick check if we are in a commit.
+        The file queried was introduced subsequent to commit_in_progress, in
+        the context of vyos-configd, and is created/removed by the backend
+        set_in_commit(bool) function as called within the commit algorithm.
+    """
+    from os import path
+    return path.exists('/var/tmp/in_commit')

@@ -28,8 +28,8 @@ from vyos.configverify import verify_vrf
 from vyos.defaults import directories
 from vyos.template import render
 from vyos.template import is_ipv4
-from vyos.utils.boot import boot_configuration_complete
 from vyos.utils.dict import dict_search
+from vyos.utils.commit import in_commit
 from vyos.utils.process import cmd
 from vyos.utils.process import call
 from vyos.utils.process import rc_cmd
@@ -308,7 +308,7 @@ def apply(login):
     # Script is invoked from vyos-router.service during startup.
     # While configuration mounting and so on is not yet complete,
     # skip any code that messes with the local user database
-    if not boot_configuration_complete():
+    if not in_commit():
         return None
 
     if 'user' in login:
