@@ -35,6 +35,8 @@ dependency_dir = os.path.join(directories['data'],
 
 dependent_func: dict[str, list[typing.Callable]] = {}
 
+DEBUG = True
+
 def canon_name(name: str) -> str:
     return os.path.splitext(name)[0].replace('-', '_')
 
@@ -44,6 +46,17 @@ def canon_name_of_path(path: str) -> str:
 
 def caller_name() -> str:
     return stack()[2].filename
+
+def name_of(f: typing.Callable) -> str:
+    return f.__name__
+
+def names_of(l: list[typing.Callable]) -> list[str]:
+    return [name_of(f) for f in l]
+
+def remove_redundant(l: list[typing.Callable]) -> list[typing.Callable]:
+    names = set()
+    for e in reversed(l):
+        l.remove(e) if name_of(e) in names else names.add(name_of(e))
 
 def read_dependency_dict(dependency_dir: str = dependency_dir) -> dict:
     res = {}
@@ -92,17 +105,25 @@ def def_closure(target: str, config: 'Config',
     return func_impl
 
 def set_dependents(case: str, config: 'Config',
-                   tagnode: typing.Optional[str] = None):
+                   tagnode: typing.Optional[str] = None,
+                   debug: bool = DEBUG):
     d = get_dependency_dict(config)
     k = canon_name_of_path(caller_name())
+    tag_ext = f'_{tagnode}' if tagnode is not None else ''
     l = dependent_func.setdefault(k, [])
     for target in d[k][case]:
         func = def_closure(target, config, tagnode)
+        func.__name__ = f'{target}{tag_ext}'
         l.append(func)
+    if debug:
+        print(f'set_dependents: caller {k}, dependents {names_of(l)}')
 
-def call_dependents():
+def call_dependents(debug: bool = DEBUG):
     k = canon_name_of_path(caller_name())
     l = dependent_func.get(k, [])
+    remove_redundant(l)
+    if debug:
+        print(f'call_dependents: caller {k}, dependents {names_of(l)}')
     while l:
         f = l.pop(0)
         f()
