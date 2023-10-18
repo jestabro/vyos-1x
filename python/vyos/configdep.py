@@ -19,6 +19,7 @@ import typing
 from inspect import stack
 from graphlib import TopologicalSorter, CycleError
 
+from vyos.configdiff import get_commit_schedule
 from vyos.utils.system import load_as_module
 from vyos.configdict import dict_merge
 from vyos.defaults import directories
@@ -104,14 +105,29 @@ def def_closure(target: str, config: 'Config',
         run_config_mode_script(script, config)
     return func_impl
 
+def get_schedule(config: 'Config') -> list[str]:
+    schedule = get_commit_schedule(config)
+    return list(map(canon_name, schedule))
+
+def is_scheduled(schedule: list, now: str, then: str) -> bool:
+    if now not in schedule or then not in schedule:
+        return False
+    if schedule.index(now) < schedule.index(then):
+        return True
+
+    return False
+
 def set_dependents(case: str, config: 'Config',
                    tagnode: typing.Optional[str] = None,
                    debug: bool = DEBUG):
     d = get_dependency_dict(config)
     k = canon_name_of_path(caller_name())
+    s = get_schedule(config)
     tag_ext = f'_{tagnode}' if tagnode is not None else ''
     l = dependent_func.setdefault(k, [])
     for target in d[k][case]:
+        if is_scheduled(s, k, target):
+            continue
         func = def_closure(target, config, tagnode)
         func.__name__ = f'{target}{tag_ext}'
         l.append(func)
