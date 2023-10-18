@@ -14,6 +14,7 @@
 # along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 from enum import IntFlag, auto
+from itertools import chain
 
 from vyos.config import Config
 from vyos.configtree import DiffTree
@@ -22,7 +23,10 @@ from vyos.configdict import list_diff
 from vyos.utils.dict import get_sub_dict
 from vyos.utils.dict import mangle_dict_keys
 from vyos.utils.dict import dict_search_args
+from vyos.utils.dict import dict_to_key_paths
 from vyos.xml_ref import get_defaults
+from vyos.xml_ref import owner
+from vyos.xml_ref import priority
 
 class ConfigDiffError(Exception):
     """
@@ -93,6 +97,32 @@ def get_config_diff(config, key_mangling=None):
 
     return ConfigDiff(config, key_mangling, diff_tree=diff_t,
                                             diff_dict=diff_d)
+
+def get_commit_schedule(config) -> list:
+    if not config or not isinstance(config, Config):
+        raise TypeError("argument must me a Config instance")
+
+    if hasattr(config, 'commit_schedule'):
+        return getattr(config, 'commit_schedule')
+
+    D = get_config_diff(config)
+    d = D._diff_dict
+    s = set()
+    for p in chain(dict_to_key_paths(d['del']), dict_to_key_paths(d['add'])):
+        p_owner = owner(p)
+        p_priority = priority(p)
+        if not p_owner:
+            continue
+        if not p_priority:
+            # default priority in legacy commit-algorithm
+            p_priority = 0
+        p_priority = int(p_priority)
+        s.add((p_priority, p_owner))
+
+    res = [x[1] for x in sorted(s, key=lambda x: x[0])]
+    setattr(config, 'commit_schedule', res)
+
+    return res
 
 class ConfigDiff(object):
     """
