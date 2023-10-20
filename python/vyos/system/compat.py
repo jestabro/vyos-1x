@@ -16,7 +16,7 @@
 from pathlib import Path
 from re import compile, MULTILINE, DOTALL
 
-from vyos.system import disk, grub, image, MOD_CFG_VER
+from vyos.system import disk, grub, image, SYSTEM_CFG_VER
 from vyos.template import render
 
 TMPL_GRUB_COMPAT: str = 'grub/grub_compat.j2'
@@ -30,7 +30,7 @@ REGEX_SANIT_INIT = r'\ ?init=\S*\ ?'
 PW_RESET_OPTION = 'init=/opt/vyatta/sbin/standalone_root_pw_reset'
 
 def in_compat_mode():
-    if grub.get_cfg_ver() >= MOD_CFG_VER:
+    if grub.get_cfg_ver() >= SYSTEM_CFG_VER:
         return False
 
     return True
@@ -137,18 +137,18 @@ def parse_menuntries(grub_path: str) -> list:
 
 def update_cfg_version():
     images_details = image.get_images_details()
-    cfg_version = min(d['module_version'] for d in images_details)
+    cfg_version = min(d['tools_version'] for d in images_details)
 
     return cfg_version
 
-def update_version_list() -> list[str]:
+def update_version_list(root_dir: str = '') -> list[str]:
     """Update list of installed VyOS versions for rendering
 
     Returns:
         list: list of installed VyOS versions
     """
-    # find root directory of persistent storage
-    root_dir = disk.find_persistence()
+    if not root_dir:
+        root_dir = disk.find_persistence()
     grub_cfg_main = f'{root_dir}/{grub.GRUB_CFG_MAIN}'
     # get list of versions in menuentries
     menu_entries = parse_menuntries(grub_cfg_main)
@@ -182,8 +182,8 @@ def grub_cfg_details() -> dict:
     details = {}
     details |= grub.vars_read(f'{root_dir}/{grub.CFG_VYOS_VARS}')
     details |= grub.vars_read(f'{root_dir}/{grub.GRUB_CFG_MAIN}')
-    details['versions'] = update_version_list()
-    details['tools_version'] = MOD_CFG_VER
+    details['versions'] = update_version_list(root_dir)
+    details['tools_version'] = SYSTEM_CFG_VER
 
     p = Path('/sys/firmware/efi')
     if p.is_dir():

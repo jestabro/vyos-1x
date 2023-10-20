@@ -20,7 +20,7 @@
 from pathlib import Path
 from sys import exit
 
-from vyos.system import disk, grub, image, compat, MOD_CFG_VER
+from vyos.system import disk, grub, image, compat, SYSTEM_CFG_VER
 from vyos.template import render
 
 
@@ -31,7 +31,7 @@ def cfg_check_update() -> bool:
         bool: False if not required, True if required
     """
     current_ver = grub.get_cfg_ver()
-    if current_ver and current_ver >= MOD_CFG_VER:
+    if current_ver and current_ver >= SYSTEM_CFG_VER:
         return False
 
     return True

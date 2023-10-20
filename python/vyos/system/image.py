@@ -28,14 +28,14 @@ CFG_VYOS_VARS: str = f'{GRUB_DIR_VYOS}/20-vyos-defaults-autoload.cfg'
 GRUB_DIR_VYOS_VERS: str = f'{GRUB_DIR_VYOS}/vyos-versions'
 # prepare regexes
 REGEX_KERNEL_CMDLINE: str = r'^BOOT_IMAGE=/(?P<boot_type>boot|live)/((?P<image_version>.+)/)?vmlinuz.*$'
-REGEX_MOD_CFG_VER: str = r'(\r\n|\r|\n)MOD_CFG_VER\s*=\s*(?P<cfg_ver>\d+)(\r\n|\r|\n)'
+REGEX_SYSTEM_CFG_VER: str = r'(\r\n|\r|\n)SYSTEM_CFG_VER\s*=\s*(?P<cfg_ver>\d+)(\r\n|\r|\n)'
 
 
 # structures definitions
 class ImageDetails(TypedDict):
     name: str
     version: str
-    module_version: int
+    tools_version: int
     disk_ro: int
     disk_rw: int
     disk_total: int
@@ -105,7 +105,7 @@ def get_image_tools_version(image_name: str, root_dir: str) -> int:
             return cfg_version_number
         finally:
             disk.partition_umount(squashfs_file)
-        cfg_version_result = re_compile(REGEX_MOD_CFG_VER).search(version_file)
+        cfg_version_result = re_compile(REGEX_SYSTEM_CFG_VER).search(version_file)
         cfg_version_number: int = int(cfg_version_result.groupdict().get('cfg_ver', 0))
 
     return cfg_version_number
@@ -168,7 +168,7 @@ def get_details(image_name: str, root_dir: str = '') -> ImageDetails:
     image_details: ImageDetails = {
         'name': image_name,
         'version': image_version,
-        'module_version': image_tools_version,
+        'tools_version': image_tools_version,
         'disk_ro': image_disk_ro,
         'disk_rw': image_disk_rw,
         'disk_total': image_disk_ro + image_disk_rw
@@ -204,7 +204,7 @@ def get_running_image() -> str:
     if running_image_result:
         running_image: str = running_image_result.groupdict().get(
             'image_version', '')
-    # we need to have a fallbak for live systems
+    # we need to have a fallback for live systems
     if not running_image:
         running_image: str = version.get_version()
 
