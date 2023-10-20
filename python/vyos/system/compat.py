@@ -149,13 +149,17 @@ def update_version_list(root_dir: str = '') -> list[str]:
     """
     if not root_dir:
         root_dir = disk.find_persistence()
+
     grub_cfg_main = f'{root_dir}/{grub.GRUB_CFG_MAIN}'
+
     # get list of versions in menuentries
     menu_entries = parse_menuntries(grub_cfg_main)
     menu_versions = find_versions(menu_entries)
+
     # get list of versions added by new or legacy tools
     current_versions = grub.version_list(root_dir)
-    # differences should be <= 1, as legacy grub.cfg will be updated on each
+
+    # difference should be <= 1, as legacy grub.cfg will be updated on each
     # add_image/delete_image
     diff = list(set(current_versions) - set(menu_versions))
     for ver in diff:
@@ -174,10 +178,10 @@ def update_version_list(root_dir: str = '') -> list[str]:
     return menu_entries
 
 
-def grub_cfg_details() -> dict:
+def grub_cfg_details(root_dir: str = '') -> dict:
     """Gather details for compatibility mode"""
-    # find root directory of persistent storage
-    root_dir = disk.find_persistence()
+    if not root_dir:
+        root_dir = disk.find_persistence()
 
     details = {}
     details |= grub.vars_read(f'{root_dir}/{grub.CFG_VYOS_VARS}')
@@ -193,5 +197,10 @@ def grub_cfg_details() -> dict:
 
     return details
 
-def render_grub_cfg(target):
-    render(target, TMPL_GRUB_COMPAT, grub_cfg_details())
+def render_grub_cfg(root_dir: str = '') -> None:
+    """Render GRUB config for compatibility mode"""
+    if not root_dir:
+        root_dir = disk.find_persistence()
+
+    details = grub_cfg_details(root_dir)
+    render(f'{root_dir}/{grub.GRUB_CFG_MAIN}', TMPL_GRUB_COMPAT, details)

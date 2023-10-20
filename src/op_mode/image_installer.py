@@ -540,7 +540,7 @@ def add_image(image_path: str) -> None:
 
     # if compatibility mode, update GRUB menu entries
     if compat.in_compat_mode():
-        compat.render_grub_cfg(f'{root_dir}/{grub.GRUB_CFG_MAIN}')
+        compat.render_grub_cfg(root_dir)
 
 def parse_arguments() -> Namespace:
     """Parse arguments

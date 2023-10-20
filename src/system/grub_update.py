@@ -100,7 +100,7 @@ if __name__ == '__main__':
     grub.write_cfg_ver(cfg_ver, root_dir)
 
     if compat.in_compat_mode():
-        compat.render_grub_cfg(grub_cfg_main)
+        compat.render_grub_cfg(root_dir)
     else:
         render(grub_cfg_main, grub.TMPL_GRUB_MAIN, {})
 

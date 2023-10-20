@@ -58,7 +58,7 @@ def delete_image(image_name: str) -> None:
 
     # if compatibility mode, update GRUB menu entries
     if compat.in_compat_mode():
-        compat.render_grub_cfg(f'{root_dir}/{grub.GRUB_CFG_MAIN}')
+        compat.render_grub_cfg()
 
 def set_image(image_name: str) -> None:
     """Set default boot image
