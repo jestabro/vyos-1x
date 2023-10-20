@@ -29,7 +29,7 @@ REGEX_SANIT_CONSOLE = r'\ ?console=[^\s\d]+[\d]+(,\d+)?\ ?'
 REGEX_SANIT_INIT = r'\ ?init=\S*\ ?'
 PW_RESET_OPTION = 'init=/opt/vyatta/sbin/standalone_root_pw_reset'
 
-def in_compat_mode():
+def mode():
     if grub.get_cfg_ver() >= SYSTEM_CFG_VER:
         return False
 
@@ -145,7 +145,7 @@ def update_version_list(root_dir: str = '') -> list[str]:
     """Update list of installed VyOS versions for rendering
 
     Returns:
-        list: list of installed VyOS versions
+        list: list of installed VyOS versions for menu items
     """
     if not root_dir:
         root_dir = disk.find_persistence()
@@ -159,8 +159,8 @@ def update_version_list(root_dir: str = '') -> list[str]:
     # get list of versions added by new or legacy tools
     current_versions = grub.version_list(root_dir)
 
-    # difference should be <= 1, as legacy grub.cfg will be updated on each
-    # add_image/delete_image
+    # difference in each case will be <= 1, as legacy grub.cfg will be
+    # updated on each add_image/delete_image
     diff = list(set(current_versions) - set(menu_versions))
     for ver in diff:
         last_version = menu_entries[0].get('version')
@@ -179,7 +179,11 @@ def update_version_list(root_dir: str = '') -> list[str]:
 
 
 def grub_cfg_details(root_dir: str = '') -> dict:
-    """Gather details for compatibility mode"""
+    """Gather details for rendering GRUB config
+
+    Returns:
+        dict: dictionary for rendering TMPL_GRUB_COMPAT
+    """
     if not root_dir:
         root_dir = disk.find_persistence()
 

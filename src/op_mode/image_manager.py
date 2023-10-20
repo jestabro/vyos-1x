@@ -57,7 +57,7 @@ def delete_image(image_name: str) -> None:
         exit(f'Unable to remove the image "{image_name}": {err}')
 
     # if compatibility mode, update GRUB menu entries
-    if compat.in_compat_mode():
+    if compat.mode():
         compat.render_grub_cfg()
 
 def set_image(image_name: str) -> None:

@@ -539,7 +539,7 @@ def add_image(image_path: str) -> None:
         exit(f'Whooops: {err}')
 
     # if compatibility mode, update GRUB menu entries
-    if compat.in_compat_mode():
+    if compat.mode():
         compat.render_grub_cfg(root_dir)
 
 def parse_arguments() -> Namespace:
