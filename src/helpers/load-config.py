@@ -3,6 +3,7 @@
 import sys
 
 from pathlib import Path
+from gzip import open as zopen
 from argparse import ArgumentParser
 
 from vyos.config import Config
@@ -17,6 +18,8 @@ def get_arguments():
                        help='Load proposed config from path.')
     group.add_argument('--stdin', '-s', action='store_true',
                        help='Load proposed config from stdin.')
+    group.add_argument('--rollback', '-r', type=int,
+                       help='Rollback a number of commits')
     return vars(parser.parse_args())
 
 def sanitize_config(ctree: ConfigTree):
@@ -32,11 +35,13 @@ def read_proposed_config():
     return proposed_str
 
 def get_running_config(config: Config) -> ConfigTree:
-    return config.get_config_tree(effective=True)
+    return config.get_config_tree(effective=False)
 
 def get_proposed_config(file: str = None) -> ConfigTree:
     if file is None:
         config_str = read_proposed_config()
+    elif file.endswith('.gz'):
+        config_str = zopen(file, 'r').read().decode()
     else:
         config_str = Path(file).read_text()
     return ConfigTree(config_str)
@@ -73,9 +78,15 @@ def run():
     if not config.in_session():
         print('not in config session; if you want to run anywhere, contact author')
         return
+    if args['file']:
+        file = args['file']
+    elif args['rollback']:
+        file = f'/opt/vyatta/etc/config/archive/config.boot.{args["rollback"]}.gz'
+    else:
+        file = None
     # Get the current and proposed config trees
     ctree = get_running_config(config)
-    ntree = get_proposed_config(args['file'])
+    ntree = get_proposed_config(file)
     # Calculate the diff between the current and proposed config
     cmds = calculate_diff(ctree, ntree)
     # Set the commands in the config session
