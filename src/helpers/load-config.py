@@ -32,7 +32,7 @@ def read_proposed_config():
     return proposed_str
 
 def get_running_config(config: Config) -> ConfigTree:
-    return config.get_config_tree(effective=True)
+    return config.get_config_tree(effective=False)
 
 def get_proposed_config(file: str = None) -> ConfigTree:
     if file is None:
