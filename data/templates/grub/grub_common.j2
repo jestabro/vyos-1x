@@ -20,3 +20,6 @@ setup_serial
 
 # find root device
 #search --no-floppy --fs-uuid --set=root ${root_uuid}
+{% if search %}
+search --no-floppy --fs-uuid --set=root {{ search }}
+{% endif %}
