@@ -16,10 +16,12 @@ def get_arguments():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--file', '-f',
                        help='Load proposed config from path.')
-    group.add_argument('--stdin', '-s', action='store_true',
+    group.add_argument('--stdin', '-i', action='store_true',
                        help='Load proposed config from stdin.')
     group.add_argument('--rollback', '-r', type=int,
                        help='Rollback a number of commits')
+    group.add_argument('--saved', '-s', action='store_true',
+                       help='Load saved startup configuration')
     return vars(parser.parse_args())
 
 def sanitize_config(ctree: ConfigTree):
@@ -82,6 +84,8 @@ def run():
         file = args['file']
     elif args['rollback']:
         file = f'/opt/vyatta/etc/config/archive/config.boot.{args["rollback"]}.gz'
+    elif args['saved']:
+        file = '/opt/vyatta/etc/config/config.boot'
     else:
         file = None
     # Get the current and proposed config trees
