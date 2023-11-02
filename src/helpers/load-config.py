@@ -85,7 +85,7 @@ def run():
     elif args['rollback']:
         file = f'/opt/vyatta/etc/config/archive/config.boot.{args["rollback"]}.gz'
     elif args['saved']:
-        file = '/config/config.boot'
+        file = '/opt/vyatta/etc/config/config.boot'
     else:
         file = None
     # Get the current and proposed config trees
