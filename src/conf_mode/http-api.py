@@ -108,7 +108,12 @@ def get_config(config=None):
     return http_api
 
 def verify(http_api):
-    return None
+    if http_api is None:
+        return
+
+    if 'keys' not in http_api:
+        raise ConfigError(
+        "At least one 'id' and 'key' must be set under the field 'keys'")
 
 def generate(http_api):
     if http_api is None:

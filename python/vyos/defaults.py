@@ -56,7 +56,6 @@ api_data = {
     'socket' : False,
     'strict' : False,
     'debug' : False,
-    'api_keys' : [ {'id' : 'testapp', 'key' : 'qwerty'} ]
 }
 
 vyos_cert_data = {
