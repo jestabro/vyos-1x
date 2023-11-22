@@ -19,6 +19,7 @@
 
 from pathlib import Path
 from sys import exit
+from time import sleep
 
 from vyos.system import disk, grub, image, compat, SYSTEM_CFG_VER
 from vyos.template import render
@@ -46,7 +47,15 @@ if __name__ == '__main__':
         exit(0)
 
     # find root directory of persistent storage
-    root_dir = disk.find_persistence()
+    # repeat check if necessary for persistence dir mount
+    for i in range(5):
+        root_dir = disk.find_persistence()
+        if root_dir:
+            break
+        print('Waiting for persistence directory mount')
+        sleep(0.7)
+    if not root_dir:
+        exit('Critical: persistence directory not available')
 
     # read current GRUB config
     grub_cfg_main = f'{root_dir}/{grub.GRUB_CFG_MAIN}'
