@@ -24,6 +24,7 @@ import pwd
 import shutil
 import sys
 import tempfile
+from stat import S_IXUSR, S_IXGRP, S_IXOTH
 
 from vyos.remote import download
 from vyos.remote import upload
@@ -77,12 +78,18 @@ def get_types(arg: str) -> tuple[str, str]:
     else:
         return 'image', arg
 
-def zealous_copy(source: str, destination: str) -> None:
+def zealous_copy(source: str, destination: str, remote_source=False) -> None:
     # Even shutil.copy2() doesn't preserve ownership across copies.
     # So we need to resort to this.
-    stats = os.stat(source)
+    if not remote_source:
+        stats = os.stat(source)
+    else:
+        dest_dir = os.path.dirname(os.path.realpath(destination))
+        stats = os.stat(dest_dir)
     shutil.copy2(source, destination)
     os.chown(destination, stats.st_uid, stats.st_gid)
+    mask = stats.st_mode & ~(S_IXUSR | S_IXGRP | S_IXOTH)
+    os.chmod(destination, mask)
 
 def get_file_type(path: str) -> str:
     return cmd(['file', '-sb', path])
@@ -247,7 +254,8 @@ def copy(source_type: str, source_path: str,
             if os.path.isdir(source):
                 shutil.copytree(source, destination_path, copy_function=zealous_copy)
             else:
-                zealous_copy(source, destination_path)
+                zealous_copy(source, destination_path,
+                             remote_source=(source_type == 'remote'))
         else:
             print_error(f'Unknown destination type: {source_type}')
             print_error(f'Valid destination types are "remote", "image" and "local".')
