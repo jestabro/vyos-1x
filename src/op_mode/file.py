@@ -151,7 +151,7 @@ def parse_image_path(image_path: str) -> str:
     """
     my-image:/foo/bar -> /lib/live/mount/persistence/boot/my-image/rw/foo/bar
     """
-    image_name, path = image_path.split(':/', 1)
+    image_name, path = image_path.split('://', 1)
     if image_name == 'running':
         image_root = '/'
     elif image_name == 'disk-install':
