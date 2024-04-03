@@ -29,7 +29,8 @@ import pyudev
 
 from vyos.configtree import ConfigTree
 from vyos.configsession import ConfigSession
-from vyos.util import cmd, boot_configuration_complete
+from vyos.utils.process import cmd
+from vyos.utils.boot import boot_configuration_complete
 from vyos.version import get_full_version_data
 
 logger = logging.getLogger(__name__)
@@ -119,7 +120,8 @@ def filtered_interface(hwid: str, intf: str) -> bool:
 def _compare(intf: str):
     """compare function for sort such that 'eth3' < 'eth10'
     """
-    return tuple(filter(None, re.split(r'^([a-z]+)', intf, maxsplit=1)))
+    s = tuple(filter(None, re.split(r'^([a-z]+)', intf, maxsplit=1)))
+    return (s[0], int(s[1]))
 
 def sort_interface_mapping(m: dict):
     """Sort for JSON output to interface.map
@@ -495,6 +497,28 @@ def initialize(context):
         write_config_remove(removed)
         write_config_add(added)
 
+def interface_event(device):
+    logger.info(f"udev event, device is {device}; action is {device.action}")
+    bare = None
+    intf = None
+    bare = device.properties.get('ID_NET_NAME_MAC', '')
+    bare = bare[-12:]
+    intf = device.properties.get('INTERFACE', '')
+    action = device.action
+
+    if not bare or not intf:
+        return
+
+    hwid = hwid_from_bare(bare)
+
+    if action == 'add':
+        logger.info(f"adding {hwid}, {intf}")
+    if action == 'remove':
+        logger.info(f"removing {hwid}, {intf}")
+    if action == 'move':
+        for p in list(device.properties):
+            logger.info(f"device.properties[{p}] = {device.properties[p]}")
+
 def main():
     cfg_group = grp.getgrnam(CFG_GROUP)
     os.setgid(cfg_group.gr_gid)
@@ -525,42 +549,22 @@ def main():
     monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by('net')
 
-    def interface_event(device):
-        logger.info(f"udev event, device is {device}; action is {device.action}")
-        bare = None
-        intf = None
-        bare = device.properties.get('ID_NET_NAME_MAC', '')
-        bare = bare[-12:]
-        intf = device.properties.get('INTERFACE', '')
-        action = device.action
+    observer = pyudev.MonitorObserver(monitor, callback=interface_event)
 
-        if not bare or not intf:
-            return
-
-        hwid = hwid_from_bare(bare)
-
-        if action == 'add':
-            logger.info(f"adding {hwid}, {intf}")
-        if action == 'remove':
-            logger.info(f"removing {hwid}, {intf}")
-        if action == 'move':
-            for p in list(device.properties):
-                logger.info(f"device.properties[{p}] = {device.properties[p]}")
-
-    def sig_handler(signum, frame):
+    def sig_handler(_signum, _frame):
         observer.stop()
         raise KeyboardInterrupt
 
     signal.signal(signal.SIGTERM, sig_handler)
 
-    observer = pyudev.MonitorObserver(monitor, callback=interface_event)
     observer.start()
 
-    try:
-        while True:
+    while True:
+        try:
             time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("exiting")
+        except KeyboardInterrupt:
+            logger.info("exiting")
+            break
 
 if __name__ == '__main__':
     main()
