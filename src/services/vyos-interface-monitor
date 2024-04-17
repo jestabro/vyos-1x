@@ -23,7 +23,9 @@ import json
 import time
 import logging
 import signal
+from pathlib import Path
 from typing import TypedDict, Optional, Union
+
 import netaddr
 import pyudev
 
@@ -156,6 +158,7 @@ def load_config(path: str) -> None:
 def write_config_add(added: Union[list[AddInterface],AddInterface]):
     """Write added interfaces to config file
     """
+    logger.debug('JSE in write_config_add')
     if not isinstance(added, list):
         added = [added]
     if not added:
@@ -182,6 +185,7 @@ def write_config_add(added: Union[list[AddInterface],AddInterface]):
                 continue
             config.set(['interfaces', intf_type, intf, 'physical-device'],
                        value=phy)
+    logger.debug('JSE writing in write_config_add')
     try:
         with open(config_path, 'w') as f:
             f.write(config.to_string())
@@ -191,6 +195,7 @@ def write_config_add(added: Union[list[AddInterface],AddInterface]):
 def write_config_remove(removed: Union[list[RemoveInterface],RemoveInterface]):
     """Write removed interfaces to config file
     """
+    logger.debug('JSE in write_config_remove')
     if not isinstance(removed, list):
         removed = [removed]
     if not removed:
@@ -208,6 +213,7 @@ def write_config_remove(removed: Union[list[RemoveInterface],RemoveInterface]):
 
         if config.exists(['interfaces', intf_type, intf]):
             config.delete(['interfaces', intf_type, intf])
+    logger.debug('JSE writing in write_config_remove')
     try:
         with open(config_path, 'w') as f:
             f.write(config.to_string())
@@ -432,22 +438,26 @@ def interface_rename(old: str, new: str) -> None:
 def temporary_name(intf: str) -> str:
     return f'tmp{intf}'
 
-def reorder_interfaces(addrs: set, fixed: dict, found: dict) -> None:
+def reorder_interfaces(addrs: set, fixed: dict, found: dict) -> set:
+    renamed = set()
     if not addrs or boot_configuration_complete():
-        return
+        return renamed
 
-    rename = addrs.copy()
-    remove = set()
+    rename = addrs
+    unchanged = set()
     for a in rename:
         if fixed[a] == found[a]:
-            remove.add(a)
-    rename = rename - remove
+            unchanged.add(a)
+    rename = rename - unchanged
+    logger.debug(f'JSE rename: {rename}')
     for a in rename:
         interface_rename(found[a], temporary_name(found[a]))
         logger.debug(f"rename {found[a]} -> {temporary_name(found[a])}")
     for a in rename:
         interface_rename(temporary_name(found[a]), fixed[a])
         logger.debug(f"rename {temporary_name(found[a])} -> {fixed[a]}")
+
+    return renamed
 
 def initialize(context):
     if not load_found_mapping(context):
@@ -474,10 +484,14 @@ def initialize(context):
     add_dict = {k: found_mapping[k] for k in add_set}
 
     removed = remove_interfaces(remove_set)
+    logger.debug(f'JSE removed: {removed}')
     reorder_interfaces(intersection, fixed_mapping,
                        found_mapping)
     inter = add_interfaces(intersection_dict)
+    logger.debug(f'JSE inter: {inter}')
     add = add_interfaces(add_dict)
+    logger.debug(f'JSE add: {add}')
+
     added = inter + add
 
     if not write_fixed_mapping():
@@ -526,7 +540,8 @@ def main():
     # preserve vyattacfg group write access to running config
     os.umask(0o002)
 
-    debug = False
+#    debug = False
+    debug = True
 
     try:
         with open('/proc/cmdline', 'r') as f:
