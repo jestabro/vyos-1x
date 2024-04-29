@@ -92,6 +92,22 @@
                 </properties>
                 <command>sudo ${vyos_op_scripts_dir}/image_manager.py --action set --image-name "${5}"</command>
               </tagNode>
+              <node name="boot-console">
+                <properties>
+                  <help>Set system console parameters at boot</help>
+                </properties>
+                <children>
+                  <leafNode name="type">
+                    <properties>
+                      <help>Set default console type at boot.</help>
+                      <completionHelp>
+                        <script>sudo ${vyos_op_scripts_dir}/image_manager.py --action list_console_types</script>
+                      </completionHelp>
+                    </properties>
+                    <command>sudo ${vyos_op_scripts_dir}/image_manager.py --action set_console_type --console-type "${5}"</command>
+                  </leafNode>
+                </children>
+              </node>
             </children>
           </node>
         </children>
