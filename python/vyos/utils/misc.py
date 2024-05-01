@@ -27,6 +27,9 @@ def begin0(*args):
     """
     return args[0]
 
+def dummy():
+    print('dummy')
+
 def install_into_config(conf, config_paths, override_prompt=True):
     # Allows op-mode scripts to install values if called from an active config session
     # config_paths: dict of config paths
