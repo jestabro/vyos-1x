@@ -22,7 +22,6 @@ from pathlib import Path
 from shutil import copy, chown, rmtree, copytree
 from glob import glob
 from sys import exit
-from sys import stdout
 from os import environ
 from os import readlink
 from os import getpid, getppid
