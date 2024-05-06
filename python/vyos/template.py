@@ -28,6 +28,8 @@ from vyos.utils.permission import chown
 # Holds template filters registered via register_filter()
 _FILTERS = {}
 _TESTS = {}
+dir_path = os.path.dirname(os.path.realpath(__file__))
+test_dir = os.path.join(dir_path, '../../data/templates')
 
 # reuse Environments with identical settings to improve performance
 @functools.lru_cache(maxsize=2)
@@ -40,10 +42,10 @@ def _get_environment(location=None):
         # and anything may be invoked for testing from a developer's machine.
         # This environment variable allows running any unmodified code
         # with a custom template location.
-        location_env_var = getenv("VYOS_TEMPLATE_DIR")
+        location_env_var = getenv("VYOS_LOCAL_TEMPLATE_DIR")
         if location_env_var:
-            print(f"Using environment variable {location_env_var}")
-            template_dir = location_env_var
+            print("Using local template directory")
+            template_dir = os.path.join(dir_path, '../../data/templates')
         else:
             template_dir = directories["templates"]
         loc_loader=FileSystemLoader(template_dir)
