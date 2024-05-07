@@ -4,6 +4,11 @@ if [ "${grub_platform}" == "efi" ]; then
     insmod efi_uga
 fi
 
+insmod usb
+insmod serial
+insmod usbserial_pl2303
+insmod usbserial_ftdi
+
 # create and activate serial console
 function setup_serial {
     # initialize the first serial port by default
@@ -14,10 +19,7 @@ function setup_serial {
           serial --unit=${console_num} --speed=115200
         fi
     elif [ "${console_type}" == "ttyUSB" ]; then
-        insmod usb
-        insmod usbserial_pl2303
-        insmod usbserial_ftdi
-        serial --unit=0 --speed=${console_speed}
+        serial --unit=0 --speed=${console_speed} --word=8 --parity=no --stop=1
     else
         serial --unit=0 --speed=${console_speed}
     fi
