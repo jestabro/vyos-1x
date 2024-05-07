@@ -17,12 +17,17 @@
 # You should have received a copy of the GNU General Public License along with
 # VyOS. If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 from pathlib import Path
 from sys import exit
 
 from vyos.system import disk, grub, image, compat, SYSTEM_CFG_VER
 from vyos.template import render
 
+logger = logging.getLogger(__name__)
+logs_handler = logging.StreamHandler()
+logger.addHandler(logs_handler)
+logger.setLevel(logging.DEBUG)
 
 def cfg_check_update() -> bool:
     """Check if GRUB structure update is required
@@ -38,6 +43,7 @@ def cfg_check_update() -> bool:
 
 
 if __name__ == '__main__':
+    logger.debug('JSE in grub_update main')
     if image.is_live_boot():
         exit(0)
 
@@ -47,6 +53,7 @@ if __name__ == '__main__':
     # Skip everything if update is not required
     if not cfg_check_update():
         exit(0)
+    logger.debug('JSE in grub_update after cfg_check_update; wtf')
 
     # find root directory of persistent storage
     root_dir = disk.find_persistence()
