@@ -14,7 +14,7 @@ menuentry "{{ version_name }}" --id {{ version_uuid }} {
     if [ "${console_type}" == "ttyS" ]; then
         set console_opts="console=tty0 console=${console_type}${console_num},${console_speed}"
     elif [ "${console_type}" == "ttyUSB" ]; then
-        set console_opts="console=tty0 console=${console_type}${console_num},${console_speed}"
+        set console_opts="console=tty0 console=${console_type}${console_num},9600"
     else
         set console_opts="console=${console_type}${console_num}"
     fi

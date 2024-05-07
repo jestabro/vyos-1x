@@ -4,10 +4,12 @@ if [ "${grub_platform}" == "efi" ]; then
     insmod efi_uga
 fi
 
-insmod usb
 insmod serial
+insmod usb
+insmod usbserial_common
 insmod usbserial_pl2303
 insmod usbserial_ftdi
+insmod usbserial_usbdebug
 
 # create and activate serial console
 function setup_serial {
