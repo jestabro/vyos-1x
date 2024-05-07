@@ -19,7 +19,7 @@ function setup_serial {
           serial --unit=${console_num} --speed=115200
         fi
     elif [ "${console_type}" == "ttyUSB" ]; then
-        serial --unit=0 --speed=${console_speed} --word=8 --parity=no --stop=1
+        serial --unit=0 --speed=9600 --word=8 --parity=no --stop=1
     else
         serial --unit=0 --speed=${console_speed}
     fi
