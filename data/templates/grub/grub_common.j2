@@ -13,6 +13,11 @@ function setup_serial {
         else
           serial --unit=${console_num} --speed=115200
         fi
+    elif [ "${console_type}" == "ttyUSB" ]; then
+        insmod usb
+        insmod usbserial_pl2303
+        insmod usbserial_ftdi
+        serial --unit=0 --speed=${console_speed}
     else
         serial --unit=0 --speed=${console_speed}
     fi
