@@ -101,7 +101,7 @@ DEFAULT_BOOT_VARS: dict[str, str] = {
     'timeout': '5',
     'console_type': 'tty',
     'console_num': '0',
-    'console_speed': '115200',
+    'console_speed': '9600',
     'bootmode': 'normal'
 }
 
