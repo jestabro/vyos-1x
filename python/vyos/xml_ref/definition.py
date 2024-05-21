@@ -118,6 +118,12 @@ class Xml:
         d = self._get_ref_path(path)
         return  self._is_multi_node(d)
 
+    def is_multi_value(self, path: list) -> bool:
+        if len(path) < 2:
+            return False
+
+        return self.is_multi(path[:-1])
+
     def _is_valueless_node(self, node: dict) -> bool:
         b = self._get_ref_node_data(node, 'valueless')
         assert isinstance(b, bool)
@@ -126,6 +132,21 @@ class Xml:
     def is_valueless(self, path: list) -> bool:
         d = self._get_ref_path(path)
         return  self._is_valueless_node(d)
+
+    def _is_secret_node(self, node: dict) -> bool:
+        b = self._get_ref_node_data(node, 'secret')
+        assert isinstance(b, bool)
+        return b
+
+    def is_secret(self, path: list) -> bool:
+        d = self._get_ref_path(path)
+        return  self._is_secret_node(d)
+
+    def is_secret_value(self, path: list) -> bool:
+        if len(path) < 2:
+            return False
+
+        return self.is_secret(path[:-1])
 
     def _is_leaf_node(self, node: dict) -> bool:
         res = self._get_ref_node_data(node, 'node_type')

@@ -47,8 +47,17 @@ def is_tag_value(path: list) -> bool:
 def is_multi(path: list) -> bool:
     return load_reference().is_multi(path)
 
+def is_multi_value(path: list) -> bool:
+    return load_reference().is_multi_value(path)
+
 def is_valueless(path: list) -> bool:
     return load_reference().is_valueless(path)
+
+def is_secret(path: list) -> bool:
+    return load_reference().is_secret(path)
+
+def is_secret_value(path: list) -> bool:
+    return load_reference().is_secret_value(path)
 
 def is_leaf(path: list) -> bool:
     return load_reference().is_leaf(path)
