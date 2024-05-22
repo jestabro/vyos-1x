@@ -467,6 +467,7 @@
                       <leafNode name="encrypted-password">
                         <properties>
                           <help>Defines the encrypted key for authentication</help>
+                          <secret/>
                           <constraint>
                             <regex>[0-9a-f]*</regex>
                           </constraint>
@@ -476,6 +477,7 @@
                       <leafNode name="plaintext-password">
                         <properties>
                           <help>Defines the clear text key for authentication</help>
+                          <secret/>
                           <constraint>
                             <regex>.{8,}</regex>
                           </constraint>
@@ -502,6 +504,7 @@
                       <leafNode name="encrypted-password">
                         <properties>
                           <help>Defines the encrypted key for privacy protocol</help>
+                          <secret/>
                           <constraint>
                             <regex>[0-9a-f]*</regex>
                           </constraint>
@@ -511,6 +514,7 @@
                       <leafNode name="plaintext-password">
                         <properties>
                           <help>Defines the clear text key for privacy protocol</help>
+                          <secret/>
                           <constraint>
                             <regex>.{8,}</regex>
                           </constraint>

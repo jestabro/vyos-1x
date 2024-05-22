@@ -15,6 +15,7 @@
     <leafNode name="passphrase">
       <properties>
         <help>Local private key passphrase</help>
+        <secret/>
       </properties>
     </leafNode>
     <leafNode name="remote-key">

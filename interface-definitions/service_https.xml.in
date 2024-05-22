@@ -26,6 +26,7 @@
                       <leafNode name="key">
                         <properties>
                           <help>HTTP API plaintext key</help>
+                          <secret/>
                         </properties>
                       </leafNode>
                     </children>

@@ -82,6 +82,7 @@
                   <leafNode name="password">
                     <properties>
                       <help>VRRP password</help>
+                      <secret/>
                       <valueHelp>
                         <format>txt</format>
                         <description>Password string (up to 8 characters)</description>

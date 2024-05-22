@@ -2,6 +2,7 @@
 <leafNode name="key">
   <properties>
     <help>Private key in PEM format</help>
+    <secret/>
     <constraint>
       <validator name="base64"/>
     </constraint>

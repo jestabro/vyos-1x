@@ -2,6 +2,7 @@
 <leafNode name="pre-shared-secret">
   <properties>
     <help>Pre-shared secret key</help>
+    <secret/>
     <valueHelp>
       <format>txt</format>
       <description>Pre-shared secret key</description>

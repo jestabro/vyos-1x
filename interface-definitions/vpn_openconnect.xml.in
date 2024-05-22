@@ -146,6 +146,7 @@
                             <leafNode name="key">
                               <properties>
                                 <help>Token Key Secret key for the token algorithm (see RFC 4226)</help>
+                                <secret/>
                                 <valueHelp>
                                   <format>txt</format>
                                   <description>OTP key in hex-encoded format</description>

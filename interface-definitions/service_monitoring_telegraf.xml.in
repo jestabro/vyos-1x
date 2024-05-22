@@ -35,6 +35,7 @@
                       <leafNode name="token">
                         <properties>
                           <help>Authentication token for InfluxDB v2</help>
+                          <secret/>
                           <valueHelp>
                             <format>txt</format>
                             <description>Authentication token</description>
@@ -82,6 +83,7 @@
                       <leafNode name="client-secret">
                         <properties>
                           <help>Application client secret</help>
+                          <secret/>
                           <constraint>
                             #include <include/constraint/alpha-numeric-hyphen-underscore.xml.i>
                           </constraint>
@@ -236,6 +238,7 @@
                       <leafNode name="password">
                         <properties>
                           <help>Authentication password</help>
+                          <secret/>
                           <valueHelp>
                             <format>txt</format>
                             <description>Authentication password</description>
@@ -294,6 +297,7 @@
                       <leafNode name="token">
                         <properties>
                           <help>Authorization token</help>
+                          <secret/>
                         </properties>
                       </leafNode>
                       <leafNode name="insecure">

@@ -17,6 +17,7 @@
         <leafNode name="password">
           <properties>
             <help>Password used for authentication</help>
+            <secret/>
           </properties>
         </leafNode>
       </children>

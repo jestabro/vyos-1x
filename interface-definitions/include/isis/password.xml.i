@@ -2,6 +2,7 @@
 <leafNode name="plaintext-password">
   <properties>
     <help>Plain-text authentication type</help>
+    <secret/>
     <valueHelp>
       <format>txt</format>
       <description>Circuit password</description>

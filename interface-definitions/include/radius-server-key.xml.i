@@ -2,6 +2,7 @@
 <leafNode name="key">
   <properties>
     <help>Shared secret key</help>
+    <secret/>
     <valueHelp>
       <format>txt</format>
       <description>Password string (key)</description>

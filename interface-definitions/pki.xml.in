@@ -125,6 +125,7 @@
           <leafNode name="parameters">
             <properties>
               <help>DH parameters in PEM format</help>
+              <secret/>
               <constraint>
                 <validator name="base64"/>
               </constraint>
@@ -233,6 +234,7 @@
               <leafNode name="key">
                 <properties>
                   <help>OpenVPN shared secret key data</help>
+                  <secret/>
                 </properties>
               </leafNode>
               <leafNode name="version">
