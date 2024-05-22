@@ -3,6 +3,7 @@
 <leafNode name="passphrase">
   <properties>
     <help>Private key passphrase</help>
+    <secret/>
     <valueHelp>
       <format>txt</format>
       <description>Passphrase to decrypt the private key</description>

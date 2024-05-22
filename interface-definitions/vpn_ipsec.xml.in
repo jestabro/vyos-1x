@@ -35,6 +35,7 @@
                   <leafNode name="secret">
                     <properties>
                       <help>IKE pre-shared secret key</help>
+                      <secret/>
                       <valueHelp>
                         <format>txt</format>
                         <description>IKE pre-shared secret key</description>

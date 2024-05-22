@@ -2,6 +2,7 @@
 <leafNode name="password">
   <properties>
     <help>BGP MD5 password</help>
+    <secret/>
   </properties>
 </leafNode>
 <!-- include end -->

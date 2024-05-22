@@ -23,6 +23,7 @@
               <leafNode name="cisco-authentication">
                 <properties>
                   <help>Pass phrase for cisco authentication</help>
+                  <secret/>
                   <valueHelp>
                     <format>txt</format>
                     <description>Pass phrase for cisco authentication</description>

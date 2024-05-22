@@ -24,6 +24,7 @@
             <leafNode name="md5-key">
               <properties>
                 <help>MD5 authentication type</help>
+                <secret/>
                 <valueHelp>
                   <format>txt</format>
                   <description>MD5 Key (16 characters or less)</description>
@@ -41,6 +42,7 @@
     <leafNode name="plaintext-password">
       <properties>
         <help>Plain text password</help>
+        <secret/>
         <valueHelp>
           <format>txt</format>
           <description>Plain text password (8 characters or less)</description>

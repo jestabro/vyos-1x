@@ -43,6 +43,7 @@
           <leafNode name="private-key">
             <properties>
               <help>Base64 encoded private key</help>
+              <secret/>
               <constraint>
                 <validator name="base64"/>
               </constraint>

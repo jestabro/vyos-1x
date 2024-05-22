@@ -149,6 +149,7 @@
         <leafNode name="key">
           <properties>
             <help>Shared secret for Dynamic Authorization Extension server</help>
+            <secret/>
           </properties>
         </leafNode>
       </children>

@@ -13,6 +13,7 @@
         <leafNode name="password">
           <properties>
             <help>Password for authentication</help>
+            <secret/>
           </properties>
         </leafNode>
         <leafNode name="static-ip">

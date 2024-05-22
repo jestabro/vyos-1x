@@ -25,6 +25,7 @@
                   <leafNode name="encrypted-password">
                     <properties>
                       <help>Encrypted password</help>
+                      <secret/>
                       <constraint>
                         <regex>(\*|\!)</regex>
                         <regex>[a-zA-Z0-9\.\/]{13}</regex>
