@@ -15,6 +15,7 @@
 import os
 import re
 import json
+import logging
 
 from ctypes import cdll, c_char_p, c_void_p, c_int, c_bool
 
@@ -160,7 +161,7 @@ class ConfigTree(object):
             self.__config = address
             self.__version = ''
 
-        self.__migration = os.environ.get('VYOS_MIGRATION')
+        self.migration_log = logging.getLogger('vyos.migrator')
 
     def __del__(self):
         if self.__config is not None:
@@ -214,8 +215,7 @@ class ConfigTree(object):
             else:
                 self.__set_add_value(self.__config, path_str, str(value).encode())
 
-        if self.__migration:
-            print(f"- op: set path: {path} value: {value} replace: {replace}")
+        self.migration_log.info(f"- op: set path: {path} value: {value} replace: {replace}")
 
     def delete(self, path):
         check_path(path)
@@ -225,8 +225,7 @@ class ConfigTree(object):
         if (res != 0):
             raise ConfigTreeError(f"Path doesn't exist: {path}")
 
-        if self.__migration:
-            print(f"- op: delete path: {path}")
+        self.migration_log.info(f"- op: delete path: {path}")
 
     def delete_value(self, path, value):
         check_path(path)
@@ -241,8 +240,7 @@ class ConfigTree(object):
             else:
                 raise ConfigTreeError()
 
-        if self.__migration:
-            print(f"- op: delete_value path: {path} value: {value}")
+        self.migration_log.info(f"- op: delete_value path: {path} value: {value}")
 
     def rename(self, path, new_name):
         check_path(path)
@@ -257,8 +255,7 @@ class ConfigTree(object):
         if (res != 0):
             raise ConfigTreeError("Path [{}] doesn't exist".format(path))
 
-        if self.__migration:
-            print(f"- op: rename old_path: {path} new_path: {new_path}")
+        self.migration_log.info(f"- op: rename old_path: {path} new_path: {new_path}")
 
     def copy(self, old_path, new_path):
         check_path(old_path)
@@ -274,8 +271,7 @@ class ConfigTree(object):
             msg = self.__get_error().decode()
             raise ConfigTreeError(msg)
 
-        if self.__migration:
-            print(f"- op: copy old_path: {old_path} new_path: {new_path}")
+        self.migration_log.info(f"- op: copy old_path: {old_path} new_path: {new_path}")
 
     def exists(self, path):
         check_path(path)

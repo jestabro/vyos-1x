@@ -14,7 +14,10 @@
 # License along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from typing import Optional
+
 from vyos.defaults import directories
+from vyos.utils.file import write_file
 
 config_file = os.path.join(directories['config'], 'config.boot')
 
@@ -37,3 +40,9 @@ def read_saved_value(path: list):
     if len(res) == 1:
         return ' '.join(res)
     return res
+
+def write_config(data: str, path: Optional[str] = None):
+    if path is not None and os.path.isfile(path) and os.access(path, os.W_OK):
+        config_file = path
+    st = os.stat(config_file)
+    write_file(config_file, data, user=st.st_uid, group=st.st_gid, mode=st.st_mode)
