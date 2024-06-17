@@ -96,12 +96,20 @@ class VersionInfo:
         self.release = release
         self.update_footer()
 
+    def update_component(self, key: str, version: int):
+        if not isinstance(version, int):
+            raise ValueError('version must be int')
+        if self.component is None:
+            self.component = {}
+        self.component[key] = version
+        self.update_footer()
+
     def write(self, config_file) -> bool:
         if self.config_body is None or self.footer_lines is None:
             return False
         try:
             with open(config_file, 'w') as f:
-                f.write(self.config_body + '\n'.join(self.footer_lines))
+                f.write(self.config_body + '\n' + '\n'.join(self.footer_lines))
         except OSError:
             return False
         return True

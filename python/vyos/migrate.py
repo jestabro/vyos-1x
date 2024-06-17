@@ -51,7 +51,7 @@ class ConfigMigrate:
         # on adding the file handler, allow write permission for cfg_group;
         # restore original umask on exit
         mask = os.umask(0o113)
-        fh = logging.FileHandler(log_file)
+        fh = logging.FileHandler(log_file, mode='w')
         formatter = logging.Formatter('%(message)s')
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
@@ -126,26 +126,26 @@ class ConfigMigrate:
             p = migrate_dir.joinpath(key)
             script_list = list(p.glob('*-to-*'))
             script_list = sorted(script_list, key=sort_func)
-            if not self.file_version.component_none and not self.force:
+            if not self.file_version.component_none() and not self.force:
                 version_start = self.file_version.component.get(key, 0)
                 script_list = filter(lambda x, st=version_start: sort_func(x)[0] >= st,
                                      script_list)
 
             for file in script_list:
                 f = file.as_posix()
-                self.logger.info('applying {f}')
+                self.logger.info(f'applying {f}')
                 try:
                     self.compose.apply_file(f, func_name='migrate')
                 except ComposeConfigError as e:
                     self.logger.error(f'config-migration error in {f}: {e}')
-                    revision.component[key] = sort_func(f)[0]
+#                    revision.update_component(key, sort_func(file)[0])
                     if self.checkpoint_file:
                         check = f'{self.checkpoint_file}_{ConfigMigrate.file_ext(file)}'
 #                        self.revision.config_body = self.compose.to_string()
                         revision.write(check)
                     break
                 else:
-                    revision.component[key] = sort_func(f)[1]
+                    revision.update_component(key, sort_func(file)[1])
                     revision.config_body = self.compose.to_string()
 
         self.file_version = revision
