@@ -23,21 +23,27 @@ from vyos.migrate import ConfigMigrate
 
 parser = ArgumentParser()
 parser.add_argument('config_file', type=str,
-                    help="configuration file to modify with system-specific settings")
+                    help="configuration file to migrate")
 parser.add_argument('--test-script', type=str,
-                    help="test effect of named script")
+                    help="test named script")
+parser.add_argument('--debug', action='store_true',
+                    help="debug and write checkpoint file on error")
+
 
 args = parser.parse_args()
 
 checkpoint_file = '/run/vyos-migrate-checkpoint'
 
+debug = args.debug
+
+if debug:
+    debug = checkpoint_file
+
 if 'vyos-migrate-debug' in Path('/proc/cmdline').read_text():
     print(f'\nmigrate-debug enabled: file {checkpoint_file}_* on error')
     debug = checkpoint_file
-else:
-    debug = None
 
-config_migrate = ConfigMigrate(args.config_file)
+config_migrate = ConfigMigrate(args.config_file, checkpoint_file=debug)
 
 if args.test_script:
     # run_script
