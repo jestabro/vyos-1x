@@ -19,7 +19,6 @@ from vyos.configtree import ConfigTree
 
 def migrate(config: ConfigTree) -> None:
     base = ['protocols', 'bgp']
-    config = ConfigTree(config_file)
 
     if not config.exists(base) or not config.is_tag(base):
         # Nothing to do

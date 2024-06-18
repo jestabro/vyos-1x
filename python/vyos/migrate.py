@@ -44,6 +44,9 @@ class ConfigMigrate:
         self.checkpoint_file = checkpoint_file
         self.logger = None
 
+        if self.file_version is None:
+            raise ValueError(f'failed to read config file {self.config_file}')
+
     def init_logger(self):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -115,7 +118,7 @@ class ConfigMigrate:
         # T4382: 'bgp' needs to follow 'quagga':
         if 'bgp' in components and 'quagga' in components:
             components.insert(components.index('quagga'),
-                             components.pop(components.index('bgp')))
+                              components.pop(components.index('bgp')))
 
         revision: VersionInfo = version_info_copy(self.file_version)
 
@@ -125,8 +128,12 @@ class ConfigMigrate:
         for key in components:
             p = migrate_dir.joinpath(key)
             script_list = list(p.glob('*-to-*'))
+            if not script_list: # retired, e.g. 'broadcast-relay'
+                revision.update_component(key, self.system_version.component[key])
+                continue
             script_list = sorted(script_list, key=sort_func)
-            if not self.file_version.component_none() and not self.force:
+
+            if not self.file_version.component_is_none() and not self.force:
                 version_start = self.file_version.component.get(key, 0)
                 script_list = filter(lambda x, st=version_start: sort_func(x)[0] >= st,
                                      script_list)
@@ -138,15 +145,13 @@ class ConfigMigrate:
                     self.compose.apply_file(f, func_name='migrate')
                 except ComposeConfigError as e:
                     self.logger.error(f'config-migration error in {f}: {e}')
-#                    revision.update_component(key, sort_func(file)[0])
                     if self.checkpoint_file:
                         check = f'{self.checkpoint_file}_{ConfigMigrate.file_ext(file)}'
-#                        self.revision.config_body = self.compose.to_string()
                         revision.write(check)
                     break
                 else:
                     revision.update_component(key, sort_func(file)[1])
-                    revision.config_body = self.compose.to_string()
+                    revision.update_config_body(self.compose.to_string())
 
         self.file_version = revision
         # backup file
@@ -203,5 +208,28 @@ class ConfigMigrate:
         self.load_config()
 
         self.run_migration_scripts()
+
+        self.write_config()
+
+    def run_script(self, test_script: str):
+        """
+        Run a single migration script. For testing this simply provides the
+        body for loading and writing the result; the component string is not
+        updated.
+        """
+
+        self.load_config()
+        self.init_logger()
+
+        os.environ['VYOS_MIGRATION'] = '1'
+
+        try:
+            self.compose.apply_file(test_script, func_name='migrate')
+        except ComposeConfigError as e:
+            print(f'config-migration error in {test_script}: {e}')
+        else:
+            self.file_version.update_config_body(self.compose.to_string())
+
+        del os.environ['VYOS_MIGRATION']
 
         self.write_config()

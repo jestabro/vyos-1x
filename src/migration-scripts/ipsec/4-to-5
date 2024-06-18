@@ -22,7 +22,7 @@ def migrate(config: ConfigTree) -> None:
         # Nothing to do
         return
 
-  lmodes = config.return_values(['vpn', 'ipsec', 'logging','log-modes'])
-  for mode in lmodes:
-    if mode == 'all':
-      config.set(['vpn', 'ipsec', 'logging','log-modes'], value='any', replace=True)
+    lmodes = config.return_values(['vpn', 'ipsec', 'logging','log-modes'])
+    for mode in lmodes:
+        if mode == 'all':
+            config.set(['vpn', 'ipsec', 'logging','log-modes'], value='any', replace=True)

@@ -25,8 +25,6 @@ def bandwidth_percent_to_val(interface, percent) -> int:
     speed = int(speed) *1000000 # convert to MBit/s
     return speed * int(percent) // 100 # integer division
 
-base = ['traffic-policy']
-
 
 def delete_orphaned_interface_policy(config, iftype, ifname, vif=None, vifs=None, vifc=None):
     """Delete unexpected traffic-policy on interfaces in cases when
@@ -50,6 +48,8 @@ def delete_orphaned_interface_policy(config, iftype, ifname, vif=None, vifs=None
 
 
 def migrate(config: ConfigTree) -> None:
+    base = ['traffic-policy']
+
     if not config.exists(base):
         # Delete orphaned nodes on interfaces T5941
         for iftype in config.list_nodes(['interfaces']):

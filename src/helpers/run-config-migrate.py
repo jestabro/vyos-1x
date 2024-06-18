@@ -26,13 +26,15 @@ parser.add_argument('config_file', type=str,
                     help="configuration file to migrate")
 parser.add_argument('--test-script', type=str,
                     help="test named script")
+parser.add_argument('--output-file', type=str,
+                    help="write to named output file instead of config file")
 parser.add_argument('--debug', action='store_true',
                     help="debug and write checkpoint file on error")
 
 
 args = parser.parse_args()
 
-checkpoint_file = '/run/vyos-migrate-checkpoint'
+checkpoint_file = '/tmp/vyos-migrate-checkpoint'
 
 debug = args.debug
 
@@ -43,10 +45,12 @@ if 'vyos-migrate-debug' in Path('/proc/cmdline').read_text():
     print(f'\nmigrate-debug enabled: file {checkpoint_file}_* on error')
     debug = checkpoint_file
 
-config_migrate = ConfigMigrate(args.config_file, checkpoint_file=debug)
+config_migrate = ConfigMigrate(args.config_file, checkpoint_file=debug,
+                               output_file=args.output_file)
 
 if args.test_script:
-    # run_script
+    # run_script and exit
+#    config_migrate.run_script(args.test_script)
     sys.exit(0)
 
 begin = datetime.now()

@@ -77,10 +77,10 @@ class VersionInfo:
     config_body: Optional[str] = None
     footer_lines: Optional[list[str]] = None
 
-    def component_none(self) -> bool:
+    def component_is_none(self) -> bool:
         return bool(self.component is None)
 
-    def config_body_none(self) -> bool:
+    def config_body_is_none(self) -> bool:
         return bool(self.config_body is None)
 
     def update_footer(self):
@@ -104,6 +104,9 @@ class VersionInfo:
         self.component[key] = version
         self.update_footer()
 
+    def update_config_body(self, config_str: str):
+        self.config_body = config_str
+
     def write(self, config_file) -> bool:
         if self.config_body is None or self.footer_lines is None:
             return False
@@ -123,8 +126,11 @@ def component_from_string(string: str) -> dict:
 
 def version_info_from_file(config_file) -> VersionInfo:
     version_info = VersionInfo()
-    with open(config_file) as f:
-        config_str = f.read()
+    try:
+        with open(config_file) as f:
+            config_str = f.read()
+    except OSError:
+        return None
 
     if len(parts := warn_filter_vyos.split(config_str)) > 1:
         vintage = 'vyos'

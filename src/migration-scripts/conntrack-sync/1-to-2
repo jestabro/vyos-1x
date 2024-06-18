@@ -21,7 +21,7 @@ from vyos.configtree import ConfigTree
 
 base = ['service', 'conntrack-sync']
 
-def migrate(config: ConfigTree, file_name: str) -> None:
+def migrate(config: ConfigTree) -> None:
     if not config.exists(base):
         # Nothing to do
         return
