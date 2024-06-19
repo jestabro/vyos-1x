@@ -18,6 +18,7 @@ import re
 import json
 import logging
 from pathlib import Path
+from grp import getgrnam
 
 import vyos.defaults
 from vyos.component_version import VersionInfo
@@ -30,10 +31,21 @@ from vyos.compose_config import ComposeConfigError
 
 log_file = os.path.join(vyos.defaults.directories['config'], 'vyos-migrate.log')
 
+def group_perm_file_handler(filename, group=None, mode='a'):
+    # pylint: disable=consider-using-with
+    if group is None:
+        return logging.FileHandler(filename, mode)
+    gid = getgrnam(group).gr_gid
+    if not os.path.exists(filename):
+        open(filename, 'a').close()
+        os.chown(filename, -1, gid)
+        os.chmod(filename, 0o664)
+    return logging.FileHandler(filename, mode)
+
 class ConfigMigrate:
-    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=too-many-instance-attributes,too-many-arguments
     # the number is reasonable in this case
-    def __init__(self, config_file: str, force=False,
+    def __init__(self, config_file: str, force=False, stream_log=False,
                  output_file: str = None, checkpoint_file: str = None):
         self.config_file: str = config_file
         self.force: bool = force
@@ -43,6 +55,7 @@ class ConfigMigrate:
         self.output_file = output_file
         self.checkpoint_file = checkpoint_file
         self.logger = None
+        self.stream_log: bool = stream_log
 
         if self.file_version is None:
             raise ValueError(f'failed to read config file {self.config_file}')
@@ -51,14 +64,17 @@ class ConfigMigrate:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
 
-        # on adding the file handler, allow write permission for cfg_group;
-        # restore original umask on exit
-        mask = os.umask(0o113)
-        fh = logging.FileHandler(log_file, mode='w')
+#        fh = logging.FileHandler(log_file, mode='w')
+        fh = group_perm_file_handler(log_file, group='vyattacfg', mode='w')
+        fh.setLevel(logging.INFO)
         formatter = logging.Formatter('%(message)s')
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
-        os.umask(mask)
+        if self.stream_log:
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.WARNING)
+            ch.setFormatter(formatter)
+            self.logger.addHandler(ch)
 
     def migration_needed(self) -> bool:
         return self.system_version.component != self.file_version.component
@@ -145,15 +161,17 @@ class ConfigMigrate:
                 try:
                     self.compose.apply_file(f, func_name='migrate')
                 except ComposeConfigError as e:
-                    self.logger.error(f'config-migration error in {f}: {e}')
+                    self.logger.error(e)
                     if self.checkpoint_file:
                         check = f'{self.checkpoint_file}_{ConfigMigrate.file_ext(file)}'
+                        revision.update_config_body(self.compose.to_string())
                         revision.write(check)
                     break
                 else:
                     revision.update_component(key, sort_func(file)[1])
-                    revision.update_config_body(self.compose.to_string())
+#                    revision.update_config_body(self.compose.to_string())
 
+        revision.update_config_body(self.compose.to_string())
         self.file_version = revision
         # backup file
         # write partial/full in place
@@ -185,8 +203,7 @@ class ConfigMigrate:
         Instantiate a ComposeConfig object with the config string.
         """
 
-        self.compose = ComposeConfig(self.file_version.config_body,
-                                     self.checkpoint_file)
+        self.compose = ComposeConfig(self.file_version.config_body, self.checkpoint_file)
 
     def run(self):
         """

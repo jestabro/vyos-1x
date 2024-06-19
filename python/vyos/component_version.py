@@ -56,7 +56,7 @@ REGEX_RELEASE_VERSION_VYATTA = r'/\* Release version:\s+(\S*)\s*\*/'
 CONFIG_FILE_VERSION = """\
 // Warning: Do not remove the following line.
 // vyos-config-version: "{}"
-// Release version: {}
+// Release version: {}\n
 """
 
 warn_filter_vyos = re.compile(REGEX_WARN_VYOS)
@@ -164,8 +164,10 @@ def version_info_from_system() -> VersionInfo:
     """
     Return system component versions.
     """
+    d = component_version()
+    sort_d = {k: v for k, v in sorted(d.items(), key=lambda x: x[0])}
     version_info = VersionInfo(
-        component = component_version(),
+        component = sort_d,
         release =  get_version(),
         vintage = 'vyos'
     )
