@@ -102,6 +102,7 @@ class VersionInfo:
         if self.component is None:
             self.component = {}
         self.component[key] = version
+        self.component = dict(sorted(self.component.items(), key=lambda x: x[0]))
         self.update_footer()
 
     def update_config_body(self, config_str: str):
