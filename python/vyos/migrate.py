@@ -166,9 +166,9 @@ class ConfigMigrate:
             script_list = sorted(script_list, key=sort_func)
 
             if not self.file_version.component_is_none() and not self.force:
-                version_start = self.file_version.component.get(key, 0)
-                script_list = filter(lambda x, st=version_start: sort_func(x)[0] >= st,
-                                     script_list)
+                start = self.file_version.component.get(key, 0)
+                script_list = list(filter(lambda x, st=start: sort_func(x)[0] >= st,
+                                          script_list))
 
             if not script_list: # no applicable migration scripts
                 revision.update_component(key, self.system_version.component[key])
@@ -192,7 +192,7 @@ class ConfigMigrate:
 
         revision.update_config_body(self.compose.to_string())
         self.normalize_config_body(revision)
-        self.file_version = revision
+        self.file_version = version_info_copy(revision)
         # backup file
         # write partial/full in place
         # warn/error if partial
