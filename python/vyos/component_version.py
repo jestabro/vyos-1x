@@ -143,6 +143,7 @@ def version_info_from_file(config_file) -> VersionInfo:
     version_info.vintage = vintage
     version_info.config_body = parts[0]
     version_lines = ''.join(parts[1:]).splitlines()
+    version_lines = [k for k in version_lines if k]
     if len(version_lines) != 3:
         raise ValueError(f'Malformed version strings: {version_lines}')
 
