@@ -227,6 +227,7 @@ class ConfigMigrate:
 
         self.run_migration_scripts()
 
+        self.update_release()
         self.write_config()
 
     def run_script(self, test_script: str):
