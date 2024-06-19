@@ -30,7 +30,8 @@ import tempfile
 import vyos.defaults
 import vyos.remote
 from vyos.configsource import ConfigSourceSession, VyOSError
-from vyos.migrator import Migrator, VirtualMigrator, MigratorError
+from vyos.migrate import ConfigMigrate
+#from vyos.migrator import Migrator, VirtualMigrator, MigratorError
 
 class LoadConfig(ConfigSourceSession):
     """A subclass for calling 'loadFile'.
@@ -81,17 +82,20 @@ with tempfile.NamedTemporaryFile() as fp:
     with open(fp.name, 'w') as fd:
         fd.write(config_string)
 
-    virtual_migration = VirtualMigrator(fp.name)
-    try:
-        virtual_migration.run()
-    except MigratorError as err:
-        sys.exit('{}'.format(err))
+#    virtual_migration = VirtualMigrator(fp.name)
+#    try:
+#        virtual_migration.run()
+#    except MigratorError as err:
+#        sys.exit('{}'.format(err))
 
-    migration = Migrator(fp.name)
-    try:
-        migration.run()
-    except MigratorError as err:
-        sys.exit('{}'.format(err))
+#    migration = Migrator(fp.name)
+#    try:
+#        migration.run()
+#    except MigratorError as err:
+#        sys.exit('{}'.format(err))
+
+    config_migrate = ConfigMigrate(fp.name)
+    config_migrate.run()
 
     try:
         config.load_config(fp.name)
