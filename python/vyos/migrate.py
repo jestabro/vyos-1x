@@ -128,15 +128,16 @@ class ConfigMigrate:
         for key in components:
             p = migrate_dir.joinpath(key)
             script_list = list(p.glob('*-to-*'))
-            if not script_list: # retired, e.g. 'broadcast-relay'
-                revision.update_component(key, self.system_version.component[key])
-                continue
             script_list = sorted(script_list, key=sort_func)
 
             if not self.file_version.component_is_none() and not self.force:
                 version_start = self.file_version.component.get(key, 0)
                 script_list = filter(lambda x, st=version_start: sort_func(x)[0] >= st,
                                      script_list)
+
+            if not script_list: # no applicable migration scripts
+                revision.update_component(key, self.system_version.component[key])
+                continue
 
             for file in script_list:
                 f = file.as_posix()
