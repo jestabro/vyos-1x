@@ -24,6 +24,7 @@ import datetime
 from vyos.utils.process import cmd
 
 import vyos.defaults
+from vyos.configtree import ConfigTree
 from vyos.component_version import VersionInfo
 from vyos.component_version import version_info_from_system
 from vyos.component_version import version_info_from_file
@@ -101,6 +102,19 @@ class ConfigMigrate:
         """
         self.file_version.update_syntax()
 
+    def normalize_config_body(self, version_info: VersionInfo):
+        """
+        This is a interim workaround for the issue of node ordering when
+        composing operations on the internal config_tree: ordering is
+        performed on parsing, hence was implicit in the old system which
+        would parse/write on each application of a migration script (~200).
+        Here, we will take the cost of one extra parsing to reorder before
+        save.
+        """
+        if not version_info.config_body_is_none():
+            ct = ConfigTree(version_info.config_body)
+            version_info.update_config_body(ct.to_string())
+
     def write_config(self):
         if self.output_file is not None:
             config_file = self.output_file
@@ -130,7 +144,7 @@ class ConfigMigrate:
         """
         os.environ['VYOS_MIGRATION'] = '1'
         self.init_logger()
-        self.logger.info("List of executed migration scripts:")
+        self.logger.info("List of applied migration modules:")
 
         components = list(self.system_version.component)
         components.sort()
@@ -177,6 +191,7 @@ class ConfigMigrate:
 #                    revision.update_config_body(self.compose.to_string())
 
         revision.update_config_body(self.compose.to_string())
+        self.normalize_config_body(revision)
         self.file_version = revision
         # backup file
         # write partial/full in place
