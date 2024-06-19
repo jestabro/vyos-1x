@@ -19,12 +19,16 @@ import json
 import logging
 from pathlib import Path
 from grp import getgrnam
+import datetime
+
+from vyos.utils.process import cmd
 
 import vyos.defaults
 from vyos.component_version import VersionInfo
 from vyos.component_version import version_info_from_system
 from vyos.component_version import version_info_from_file
 from vyos.component_version import version_info_copy
+from vyos.component_version import version_info_prune_component
 from vyos.compose_config import ComposeConfig
 from vyos.compose_config import ComposeConfigError
 
@@ -137,6 +141,7 @@ class ConfigMigrate:
                               components.pop(components.index('bgp')))
 
         revision: VersionInfo = version_info_copy(self.file_version)
+        version_info_prune_component(revision, self.system_version)
 
         migrate_dir = Path(vyos.defaults.directories['migrate'])
         sort_func = ConfigMigrate.sort_function()
@@ -205,6 +210,14 @@ class ConfigMigrate:
 
         self.compose = ComposeConfig(self.file_version.config_body, self.checkpoint_file)
 
+    def backup(self):
+        # pylint: disable=consider-using-f-string
+        separator = "."
+        backup = separator.join([self.config_file,
+                                 '{0:%Y-%m-%d-%H%M%S}'.format(datetime.datetime.now()),
+                                 'pre-migration'])
+        cmd(f'cp -p {self.config_file} {backup}')
+
     def run(self):
         """
         If migration needed, run migration scripts and update config file.
@@ -222,6 +235,8 @@ class ConfigMigrate:
         if self.syntax_update_needed():
             self.update_syntax()
             self.write_config()
+
+        self.backup()
 
         self.load_config()
 

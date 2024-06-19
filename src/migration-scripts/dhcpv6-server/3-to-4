@@ -26,12 +26,13 @@ option_nodes = ['captive-portal', 'domain-search', 'name-server',
                 'nis-domain', 'nis-server', 'nisplus-domain', 'nisplus-server',
                 'sip-server', 'sntp-server', 'vendor-option']
 
-subnet_id = 1
 
 def migrate(config: ConfigTree) -> None:
     if not config.exists(base):
         # Nothing to do
         return
+
+    subnet_id = 1
 
     for network in config.list_nodes(base):
         if config.exists(base + [network, 'subnet']):

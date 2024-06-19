@@ -166,7 +166,7 @@ def version_info_from_system() -> VersionInfo:
     Return system component versions.
     """
     d = component_version()
-    sort_d = {k: v for k, v in sorted(d.items(), key=lambda x: x[0])}
+    sort_d = dict(sorted(d.items(), key=lambda x: x[0]))
     version_info = VersionInfo(
         component = sort_d,
         release =  get_version(),
@@ -176,7 +176,16 @@ def version_info_from_system() -> VersionInfo:
     return version_info
 
 def version_info_copy(v: VersionInfo) -> VersionInfo:
+    """
+    Make a copy of dataclass.
+    """
     return replace(v)
+
+def version_info_prune_component(x: VersionInfo, y: VersionInfo) -> VersionInfo:
+    """
+    In place pruning of component keys of x not in y.
+    """
+    x.component = { k: v for k,v in x.component.items() if k in y.component }
 
 def from_string(string_line, vintage='vyos'):
     """

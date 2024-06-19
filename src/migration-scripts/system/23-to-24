@@ -22,7 +22,7 @@ from vyos.template import is_ipv4
 base = ['protocols', 'static', 'arp']
 tmp_base = ['protocols', 'static', 'arp-tmp']
 
-def fixup_cli(config, path, interface):
+def fixup_cli(config, path, interface, host):
     if config.exists(path + ['address']):
         for address in config.return_values(path + ['address']):
             tmp = ip_interface(address)
@@ -51,21 +51,21 @@ def migrate(config: ConfigTree) -> None:
         for type in config.list_nodes(['interfaces']):
             for interface in config.list_nodes(['interfaces', type]):
                 if_base = ['interfaces', type, interface]
-                fixup_cli(config, if_base, interface)
+                fixup_cli(config, if_base, interface, host)
 
                 if config.exists(if_base + ['vif']):
                     for vif in config.list_nodes(if_base + ['vif']):
                         vif_base = ['interfaces', type, interface, 'vif', vif]
-                        fixup_cli(config, vif_base, f'{interface}.{vif}')
+                        fixup_cli(config, vif_base, f'{interface}.{vif}', host)
 
                 if config.exists(if_base + ['vif-s']):
                     for vif_s in config.list_nodes(if_base + ['vif-s']):
                         vif_s_base = ['interfaces', type, interface, 'vif-s', vif_s]
-                        fixup_cli(config, vif_s_base, f'{interface}.{vif_s}')
+                        fixup_cli(config, vif_s_base, f'{interface}.{vif_s}', host)
 
                         if config.exists(if_base + ['vif-s', vif_s, 'vif-c']):
                             for vif_c in config.list_nodes(if_base + ['vif-s', vif_s, 'vif-c']):
                                 vif_c_base = ['interfaces', type, interface, 'vif-s', vif_s, 'vif-c', vif_c]
-                                fixup_cli(config, vif_c_base, f'{interface}.{vif_s}.{vif_c}')
+                                fixup_cli(config, vif_c_base, f'{interface}.{vif_s}.{vif_c}', host)
 
     config.delete(tmp_base)
