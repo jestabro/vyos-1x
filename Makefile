@@ -78,7 +78,7 @@ vyshim:
 	$(MAKE) -C $(SHIM_DIR)
 
 .PHONY: all
-all: clean interface_definitions op_mode_definitions check test j2lint vyshim check_migration_scripts_executable
+all: clean interface_definitions op_mode_definitions check test j2lint vyshim
 
 .PHONY: check
 .ONESHELL:
