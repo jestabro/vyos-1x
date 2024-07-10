@@ -107,7 +107,7 @@ def run_config_mode_script(script: str, config: 'Config'):
         mod.generate(c)
         mod.apply(c)
     except (VyOSError, ConfigError) as e:
-        raise ConfigError(repr(e))
+        raise ConfigError(str(e)) from e
 
 def def_closure(target: str, config: 'Config',
                 tagnode: typing.Optional[str] = None) -> typing.Callable:
@@ -125,7 +125,7 @@ def set_dependents(case: str, config: 'Config',
     tag_ext = f'_{tagnode}' if tagnode is not None else ''
     if hasattr(config, 'dependent_func') and not FORCE_LOCAL:
         dependent_func = getattr(config, 'dependent_func')
-        l = dependent_func.setdefault('vyos_configd', [])
+        l = dependent_func.setdefault(k, [])
     else:
         dependent_func = local_dependent_func
         l = dependent_func.setdefault(k, [])
@@ -135,18 +135,25 @@ def set_dependents(case: str, config: 'Config',
         append_uniq(l, func)
     debug_print(f'set_dependents: caller {k}, dependents {names_of(l)}')
 
-def call_dependents(dependent_func: dict = None):
-    k = canon_name_of_path(caller_name())
+def call_dependents(dependent_func: dict = None, script_name: str = None):
     if dependent_func is None or FORCE_LOCAL:
         dependent_func = local_dependent_func
+        k = canon_name_of_path(caller_name())
         l = dependent_func.get(k, [])
     else:
-        l = dependent_func.get('vyos_configd', [])
+        if script_name is None:
+            raise ConfigError('missing script_name in call_dependents')
+        k = canon_name(script_name)
+        l = dependent_func.get(k, [])
     debug_print(f'call_dependents: caller {k}, dependents {names_of(l)}')
     while l:
         f = l.pop(0)
         debug_print(f'calling: {f.__name__}')
-        f()
+        try:
+            f()
+        except ConfigError as e:
+            s = f'dependent {f.__name__}: {str(e)}'
+            raise ConfigError(s) from e
 
 def called_as_dependent() -> bool:
     st = stack()[1:]
