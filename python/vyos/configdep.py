@@ -34,6 +34,7 @@ dependency_dir = os.path.join(directories['data'],
                               'config-mode-dependencies')
 
 local_dependent_func: dict[str, list[typing.Callable]] = {}
+dependent_func: dict[str, list[typing.Callable]] = None
 
 DEBUG = False
 FORCE_LOCAL = False
@@ -113,38 +114,35 @@ def def_closure(target: str, config: 'Config',
                 tagnode: typing.Optional[str] = None) -> typing.Callable:
     script = target + '.py'
     def func_impl():
-        if tagnode:
+        if tagnode is not None:
             os.environ['VYOS_TAGNODE_VALUE'] = tagnode
         run_config_mode_script(script, config)
+    tag_ext = f'_{tagnode}' if tagnode is not None else ''
+    func_impl.__name__ = f'{target}{tag_ext}'
     return func_impl
 
 def set_dependents(case: str, config: 'Config',
                    tagnode: typing.Optional[str] = None):
+    global dependent_func
+
     d = get_dependency_dict(config)
     k = canon_name_of_path(caller_name())
-    tag_ext = f'_{tagnode}' if tagnode is not None else ''
+
     if hasattr(config, 'dependent_func') and not FORCE_LOCAL:
         dependent_func = getattr(config, 'dependent_func')
-        l = dependent_func.setdefault(k, [])
     else:
         dependent_func = local_dependent_func
-        l = dependent_func.setdefault(k, [])
+    l = dependent_func.setdefault(k, [])
+
     for target in d[k][case]:
         func = def_closure(target, config, tagnode)
-        func.__name__ = f'{target}{tag_ext}'
         append_uniq(l, func)
+
     debug_print(f'set_dependents: caller {k}, dependents {names_of(l)}')
 
-def call_dependents(dependent_func: dict = None, script_name: str = None):
-    if dependent_func is None or FORCE_LOCAL:
-        dependent_func = local_dependent_func
-        k = canon_name_of_path(caller_name())
-        l = dependent_func.get(k, [])
-    else:
-        if script_name is None:
-            raise ConfigError('missing script_name in call_dependents')
-        k = canon_name(script_name)
-        l = dependent_func.get(k, [])
+def call_dependents():
+    k = canon_name_of_path(caller_name())
+    l = dependent_func.get(k, [])
     debug_print(f'call_dependents: caller {k}, dependents {names_of(l)}')
     while l:
         f = l.pop(0)
