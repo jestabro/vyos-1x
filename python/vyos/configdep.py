@@ -33,10 +33,9 @@ if typing.TYPE_CHECKING:
 dependency_dir = os.path.join(directories['data'],
                               'config-mode-dependencies')
 
-local_dependent_func: dict[str, list[typing.Callable]] = {}
-dependent_func: dict[str, list[typing.Callable]] = None
+dependent_func: dict[str, list[typing.Callable]] = {}
 
-DEBUG = False
+DEBUG = True
 FORCE_LOCAL = False
 
 def debug_print(s: str):
@@ -130,8 +129,7 @@ def set_dependents(case: str, config: 'Config',
 
     if hasattr(config, 'dependent_func') and not FORCE_LOCAL:
         dependent_func = getattr(config, 'dependent_func')
-    else:
-        dependent_func = local_dependent_func
+
     l = dependent_func.setdefault(k, [])
 
     for target in d[k][case]:
