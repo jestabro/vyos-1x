@@ -26,12 +26,12 @@ from tempfile import NamedTemporaryFile
 from typing import Union, Literal, TypeAlias, get_type_hints, get_args
 
 from vyos.config import Config
-from vyos.configtree import ConfigTree, DiffTree
+from vyos.configtree import ConfigTree, DiffTree, cstore_diff
 from vyos.configsource import ConfigSourceSession, VyOSError
 from vyos.migrate import ConfigMigrate, ConfigMigrateError
 from vyos.utils.process import popen, DEVNULL
 
-Variety: TypeAlias = Literal['explicit', 'batch', 'tree', 'legacy']
+Variety: TypeAlias = Literal['explicit', 'batch', 'configtree', 'legacy']
 ConfigObj: TypeAlias = Union[str, ConfigTree]
 
 thismod = sys.modules[__name__]
@@ -143,9 +143,16 @@ def load_batch(config_obj: ConfigObj):
     # requires legacy backend patch
     raise NotImplementedError('batch loading not implemented')
 
-def load_tree(config_obj: ConfigObj):
-    # requires vyconf backend patch
-    raise NotImplementedError('tree loading not implemented')
+def load_configtree(config_obj: ConfigObj):
+    conf = Config()
+    left = get_running_config(conf)
+    if isinstance(config_obj, ConfigTree):
+        right = config_obj
+    else:
+        right = get_proposed_config(config_obj)
+
+    out = cstore_diff(left, right)
+    return out
 
 def load_legacy(config_obj: ConfigObj):
     """Legacy load from file or configtree.
@@ -159,12 +166,14 @@ def load_legacy(config_obj: ConfigObj):
     config = LoadConfig()
 
     try:
-        config.load_config(config_file)
+        out = config.load_config(config_file)
     except VyOSError as e:
         raise LoadConfigError(e) from e
     finally:
         if isinstance(config_obj, ConfigTree):
             Path(config_file).unlink()
+
+    return out
 
 def load(config_obj: ConfigObj, strict: bool = True,
          switch: Variety = 'legacy'):
@@ -178,4 +187,5 @@ def load(config_obj: ConfigObj, strict: bool = True,
     config_obj = migrate(config_obj)
 
     func = getattr(thismod, f'load_{switch}')
-    func(config_obj)
+    out = func(config_obj)
+    return out
