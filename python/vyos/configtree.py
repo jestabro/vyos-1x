@@ -385,6 +385,24 @@ def show_diff(left, right, path=[], commands=False, libpath=LIBPATH):
     res = unescape_backslash(res)
     return res
 
+def cstore_diff(left, right, libpath=LIBPATH):
+    if left is None:
+        left = ConfigTree(config_string='\n')
+    if right is None:
+        right = ConfigTree(config_string='\n')
+    if not (isinstance(left, ConfigTree) and isinstance(right, ConfigTree)):
+        raise TypeError("Arguments must be instances of ConfigTree")
+
+    __lib = cdll.LoadLibrary(libpath)
+    __load_config = __lib.load_config
+    __load_config.argtypes = [c_void_p, c_void_p]
+    __load_config.restype = c_char_p
+
+    out = __load_config(left._get_config(), right._get_config())
+    out = out.decode()
+
+    return out
+
 def union(left, right, libpath=LIBPATH):
     if left is None:
         left = ConfigTree(config_string='\n')
