@@ -46,17 +46,24 @@ def translate_position(s: str, pos: list[str]) -> str:
     s = s.replace('${vyos_op_scripts_dir}', directories['op_mode'])
     s = s.replace('${vyos_libexec_dir}', directories['base'])
     pat: re.Pattern = re.compile(r'(?:\$([0-9]+))')
-    t: str = pat.sub(r'{\1}', s)
+    t: str = pat.sub(r'_dummy_\1', s)
+    print(f'JSE s is: {s}')
+    print(f'JSE t is: {t}')
+    print(f'JSE pos is: {pos}')
+    d: dict = {str(pos.index(i)): i for i in pos}
+
     try:
-        res: str = t.format(*pos)
-    except IndexError as e:
-        # op-mode definition file errors
-        if DEBUG:
-            print(f'{str(e)}: {s}; {pos}')
+        for i in range(len(pos)):
+            t = t.replace(f'_dummy_{i+1}', pos[i])
+        print(f'JSE now t is: {t}')
+
         res = t
-    except KeyError:
-        # does not extend to recursive definitions '{@:n}'
+#        res: str = t % d
+    except TypeError as e:
+        print(f'JSE {e}: str is {s}; pos_dict is {d}')
         res = t
+
+    print(f'JSE res is: {res}')
 
     return res
 
@@ -81,7 +88,7 @@ def insert_node(n: Element, d: PathData, path = None) -> None:
     command_text = None if command is None else command.text
     if command_text is not None:
         pos = path.copy()
-        pos.insert(0, '')
+#        pos.insert(0, '')
         command_text = translate_position(command_text, pos)
 
     # force list for type checking
