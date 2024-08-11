@@ -27,7 +27,6 @@ from os.path import abspath
 from os.path import dirname
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element
-from typing import TypedDict
 from typing import TypeAlias
 from typing import Optional
 from typing import Union
@@ -37,20 +36,16 @@ _here = dirname(__file__)
 sys.path.append(join(_here, '..'))
 from defaults import directories
 
+from op_definition import NodeData
+from op_definition import PathData
+
 xml_op_cache_json = 'xml_op_cache.json'
 xml_op_tmp = join('/tmp', xml_op_cache_json)
 pkg_cache = abspath(join(_here, 'pkg_cache'))
-
-class NodeData(TypedDict):
-    node_type: Optional[str]
-    help_text: Optional[str]
-    comp_help: Optional[dict[str, list]]
-    command: Optional[str]
-    path: Optional[list[str]]
-
+op_ref_cache = abspath(join(_here, 'op_cache.py'))
 
 OptElement: TypeAlias = Optional[Element]
-PathData: TypeAlias = dict[str, Union[NodeData|list['PathData']]]
+#PathData: TypeAlias = dict[str, Union[NodeData|list['PathData']]]
 DEBUG = False
 
 
@@ -182,13 +177,13 @@ def main():
     for fname in glob.glob(f'{xml_dir}/*.xml'):
         parse_file(fname, d)
 
-#    with open(output_path, 'w') as f:
-#        json.dump(l, f, indent=2)
-
     with open(xml_op_tmp, 'w') as f:
         json.dump(l, f, indent=2)
 
     with open(xml_op_cache, 'w') as f:
+        f.write(f'op_reference = {str(l)}')
+
+    with open(op_ref_cache, 'w') as f:
         f.write(f'op_reference = {str(l)}')
 
 if __name__ == '__main__':
