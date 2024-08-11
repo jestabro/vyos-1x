@@ -16,7 +16,9 @@
 #
 #
 
+import os
 import re
+import sys
 import json
 import glob
 from argparse import ArgumentParser
@@ -27,7 +29,10 @@ from typing import TypeAlias
 from typing import Optional
 from typing import Union
 
-from vyos.defaults import directories
+_here = os.path.dirname(__file__)
+
+sys.path.append(os.path.join(_here, '..'))
+from defaults import directories
 
 
 class NodeData(TypedDict):
