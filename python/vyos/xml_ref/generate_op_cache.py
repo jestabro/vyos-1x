@@ -16,12 +16,15 @@
 #
 #
 
-import os
 import re
 import sys
 import json
 import glob
 from argparse import ArgumentParser
+from argparse import ArgumentTypeError
+from os.path import join
+from os.path import abspath
+from os.path import dirname
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element
 from typing import TypedDict
@@ -29,11 +32,14 @@ from typing import TypeAlias
 from typing import Optional
 from typing import Union
 
-_here = os.path.dirname(__file__)
+_here = dirname(__file__)
 
-sys.path.append(os.path.join(_here, '..'))
+sys.path.append(join(_here, '..'))
 from defaults import directories
 
+xml_op_cache_json = 'xml_op_cache.json'
+xml_op_tmp = join('/tmp', xml_op_cache_json)
+pkg_cache = abspath(join(_here, 'pkg_cache'))
 
 class NodeData(TypedDict):
     node_type: Optional[str]
@@ -148,15 +154,27 @@ def parse_file(file_path, d):
         insert_node(n, d)
 
 
+def non_trivial(s):
+    if not s:
+        raise ArgumentTypeError("Argument must be non empty string")
+    return s
+
+
 def main():
     parser = ArgumentParser(description='generate dict from xml defintions')
     parser.add_argument('--xml-dir', type=str, required=True,
                         help='transcluded xml op-mode-definition file')
-    parser.add_argument('--output-path', default='./op-mode-cache',
-                        help='path to generated cache')
-    args = parser.parse_args()
-    xml_dir = args.xml_dir
-    output_path = args.output_path
+    parser.add_argument('--package-name', type=non_trivial, default='vyos-1x',
+                        help='name of current package')
+    parser.add_argument('--output-path', help='path to generated cache')
+    args = vars(parser.parse_args())
+
+    xml_dir = abspath(args['xml_dir'])
+    pkg_name = args['package_name'].replace('-','_')
+    op_cache_name = pkg_name + '_op_cache.py'
+    out_path = args['output_path']
+    path = out_path if out_path is not None else pkg_cache
+    xml_op_cache = abspath(join(path, op_cache_name))
 
     d = {}
     l = [d]
@@ -164,9 +182,14 @@ def main():
     for fname in glob.glob(f'{xml_dir}/*.xml'):
         parse_file(fname, d)
 
-    with open(output_path, 'w') as f:
+#    with open(output_path, 'w') as f:
+#        json.dump(l, f, indent=2)
+
+    with open(xml_op_tmp, 'w') as f:
         json.dump(l, f, indent=2)
 
+    with open(xml_op_cache, 'w') as f:
+        f.write(f'op_reference = {str(l)}')
 
 if __name__ == '__main__':
     main()
