@@ -29,7 +29,6 @@ from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element
 from typing import TypeAlias
 from typing import Optional
-from typing import Union
 
 _here = dirname(__file__)
 
@@ -77,8 +76,8 @@ def translate_op_script(s: str) -> str:
     return s
 
 
-def insert_node(n: Element, d: PathData, path = None) -> None:
-    # pylint: disable=too-many-locals
+def insert_node(n: Element, l: list[PathData], path = None) -> None:
+    # pylint: disable=too-many-locals,too-many-branches
     prop: OptElement = n.find('properties')
     children: OptElement = n.find('children')
     command: OptElement = n.find('command')
@@ -123,28 +122,34 @@ def insert_node(n: Element, d: PathData, path = None) -> None:
             comp_help['fs_path'] = path_l
             comp_help['script'] = script_l
 
-    l = d.setdefault(name, [])
-    # this to satisfy mypy; it is always the case by construction
-    assert isinstance(l, list)
+    for d in l:
+        if name in list(d):
+            break
+    else:
+        d = {}
+        l.append(d)
+
+    inner_l = d.setdefault(name, [])
+
     inner_d: PathData = {'node_data': NodeData(node_type=node_type,
                                                help_text=help_text,
                                                comp_help=comp_help,
                                                command=command_text,
                                                path=path)}
-    l.append(inner_d)
+    inner_l.append(inner_d)
 
     if children is not None:
         inner_nodes = children.iterfind("*")
         for inner_n in inner_nodes:
             inner_path = path[:]
-            insert_node(inner_n, inner_d, inner_path)
+            insert_node(inner_n, inner_l, inner_path)
 
 
-def parse_file(file_path, d):
+def parse_file(file_path, l):
     tree = ET.parse(file_path)
     root = tree.getroot()
     for n in root.iterfind("*"):
-        insert_node(n, d)
+        insert_node(n, l)
 
 
 def non_trivial(s):
@@ -162,11 +167,10 @@ def main():
 
     xml_dir = abspath(args['xml_dir'])
 
-    d = {}
-    l = [d]
+    l = []
 
     for fname in glob.glob(f'{xml_dir}/*.xml'):
-        parse_file(fname, d)
+        parse_file(fname, l)
 
     with open(xml_op_tmp, 'w') as f:
         json.dump(l, f, indent=2)
