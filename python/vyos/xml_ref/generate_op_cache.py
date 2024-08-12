@@ -41,11 +41,9 @@ from op_definition import PathData
 
 xml_op_cache_json = 'xml_op_cache.json'
 xml_op_tmp = join('/tmp', xml_op_cache_json)
-#pkg_cache = abspath(join(_here, 'pkg_cache'))
 op_ref_cache = abspath(join(_here, 'op_cache.py'))
 
 OptElement: TypeAlias = Optional[Element]
-#PathData: TypeAlias = dict[str, Union[NodeData|list['PathData']]]
 DEBUG = False
 
 
@@ -159,17 +157,10 @@ def main():
     parser = ArgumentParser(description='generate dict from xml defintions')
     parser.add_argument('--xml-dir', type=str, required=True,
                         help='transcluded xml op-mode-definition file')
-#    parser.add_argument('--package-name', type=non_trivial, default='vyos-1x',
-#                        help='name of current package')
-#    parser.add_argument('--output-path', help='path to generated cache')
+
     args = vars(parser.parse_args())
 
     xml_dir = abspath(args['xml_dir'])
-#    pkg_name = args['package_name'].replace('-','_')
-#    op_cache_name = pkg_name + '_op_cache.py'
-#    out_path = args['output_path']
-#    path = out_path if out_path is not None else pkg_cache
-#    xml_op_cache = abspath(join(path, op_cache_name))
 
     d = {}
     l = [d]
@@ -179,9 +170,6 @@ def main():
 
     with open(xml_op_tmp, 'w') as f:
         json.dump(l, f, indent=2)
-
-#    with open(xml_op_cache, 'w') as f:
-#        f.write(f'op_reference = {str(l)}')
 
     with open(op_ref_cache, 'w') as f:
         f.write(f'op_reference = {str(l)}')

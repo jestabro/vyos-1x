@@ -37,18 +37,13 @@ class OpXml:
     def define(self, op_ref: list[PathData]) -> None:
         self.op_ref = op_ref
 
-#    def _get_ref_node_data(self, node: dict, data: str) -> Union[bool, str]:
-
     def _get_op_ref_path(self, path: list[str]) -> list[PathData]:
         def _get_path_list(path: list[str], l: list[PathData]) -> list[PathData]:
             if not path:
                 return l
             for d in l:
                 if path[0] in list(d):
-                    print(f'JSE {path[0]} in {list(d)}')
                     return _get_path_list(path[1:], d[path[0]])
-                else:
-                    print(f'JSE {path[0]} not in {list(d)}')
             return []
         l = self.op_ref
         return _get_path_list(path, l)
