@@ -26,7 +26,7 @@ from tempfile import NamedTemporaryFile
 from typing import Union, Literal, TypeAlias, get_type_hints, get_args
 
 from vyos.config import Config
-from vyos.configtree import ConfigTree, DiffTree, cstore_diff
+from vyos.configtree import ConfigTree, DiffTree
 from vyos.configsource import ConfigSourceSession, VyOSError
 from vyos.migrate import ConfigMigrate, ConfigMigrateError
 from vyos.utils.process import popen, DEVNULL
@@ -144,15 +144,7 @@ def load_batch(config_obj: ConfigObj):
     raise NotImplementedError('batch loading not implemented')
 
 def load_configtree(config_obj: ConfigObj):
-    conf = Config()
-    left = get_running_config(conf)
-    if isinstance(config_obj, ConfigTree):
-        right = config_obj
-    else:
-        right = get_proposed_config(config_obj)
-
-    out = cstore_diff(left, right)
-    return out
+    raise NotImplementedError('moved to external executable')
 
 def load_legacy(config_obj: ConfigObj):
     """Legacy load from file or configtree.
