@@ -24,6 +24,8 @@ declare action=$1; shift
 declare -x BOOTFILE=$vyatta_sysconfdir/config/config.boot
 declare -x DEFAULT_BOOTFILE=$vyatta_sysconfdir/config.boot.default
 
+declare -x VYCONF_CONFIG=/usr/libexec/vyos/vyconf/config
+
 # If vyos-config= boot option is present, use that file instead
 for x in $(cat /proc/cmdline); do
     [[ $x = vyos-config=* ]] || continue
@@ -145,6 +147,10 @@ init_bootfile () {
         fi
         chgrp ${GROUP} $BOOTFILE
         chmod 660 $BOOTFILE
+    fi
+    if [ -d $VYCONF_CONFIG ] ; then
+        cp -f $BOOTFILE $VYCONF_CONFIG/config.boot
+        cp -f $DEFAULT_BOOTFILE $VYCONF_CONFIG/config.failsafe
     fi
 }
 
