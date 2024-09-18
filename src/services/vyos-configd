@@ -23,8 +23,11 @@ import typing
 import logging
 import signal
 import importlib.util
-import zmq
+import io
 from contextlib import contextmanager
+from contextlib import redirect_stdout
+
+import zmq
 
 from vyos.defaults import directories
 from vyos.utils.boot import boot_configuration_complete
@@ -134,6 +137,12 @@ def explicit_print(path, mode, msg):
     except OSError:
         logger.critical("error explicit_print")
 
+def write_stdout_log(file_name, msg):
+    if boot_configuration_complete():
+        return
+    with open(file_name, 'a') as f:
+        f.write(msg)
+
 def run_script(script_name, config, args) -> int:
     script = conf_mode_scripts[script_name]
     script.argv = args
@@ -145,13 +154,13 @@ def run_script(script_name, config, args) -> int:
         script.apply(c)
     except ConfigError as e:
         logger.error(e)
-        explicit_print(session_out, session_mode, str(e))
-        return R_ERROR_COMMIT
+#        explicit_print(session_out, session_mode, str(e))
+        return R_ERROR_COMMIT, str(e)
     except Exception as e:
         logger.critical(e)
-        return R_ERROR_DAEMON
+        return R_ERROR_DAEMON, str(e)
 
-    return R_SUCCESS
+    return R_SUCCESS, ""
 
 def initialization(socket):
     global session_out
@@ -200,9 +209,9 @@ def initialization(socket):
         session_out = None
 
     # if not a 'live' session, for example on boot, write to file
-    if not session_out or not boot_configuration_complete():
-        session_out = script_stdout_log
-        session_mode = 'a'
+#    if not session_out or not boot_configuration_complete():
+#        session_out = script_stdout_log
+#        session_mode = 'a'
 
     os.environ['SUDO_USER'] = sudo_user_string
     if temp_config_dir_string:
@@ -229,10 +238,11 @@ def initialization(socket):
 
     return config
 
-def process_node_data(config, data, last: bool = False) -> int:
+def process_node_data(config, data, _last: bool = False) -> int:
     if not config:
-        logger.critical(f"Empty config")
-        return R_ERROR_DAEMON
+        out = "Empty config"
+        logger.critical(out)
+        return R_ERROR_DAEMON, out
 
     script_name = None
     os.environ['VYOS_TAGNODE_VALUE'] = ''
@@ -246,8 +256,9 @@ def process_node_data(config, data, last: bool = False) -> int:
     if res.group(2):
         script_name = res.group(2)
     if not script_name:
-        logger.critical(f"Missing script_name")
-        return R_ERROR_DAEMON
+        out = "Missing script_name"
+        logger.critical(out)
+        return R_ERROR_DAEMON, out
     if res.group(3):
         args = res.group(3).split()
     args.insert(0, f'{script_name}.py')
@@ -259,12 +270,16 @@ def process_node_data(config, data, last: bool = False) -> int:
     scripts_called.append(script_record)
 
     if script_name not in include_set:
-        return R_PASS
+        return R_PASS, ""
 
-    with stdout_redirected(session_out, session_mode):
-        result = run_script(script_name, config, args)
+#    with stdout_redirected(session_out, session_mode):
+#        result = run_script(script_name, config, args)
+    with redirect_stdout(io.StringIO()) as o:
+        result, err_out = run_script(script_name, config, args)
+    amb_out = o.getvalue()
+    o.close()
 
-    return result
+    return result, amb_out + err_out
 
 def remove_if_file(f: str):
     try:
@@ -316,10 +331,13 @@ if __name__ == '__main__':
             socket.send(resp.encode())
             config = initialization(socket)
         elif message["type"] == "node":
-            res = process_node_data(config, message["data"], message["last"])
+            res, out = process_node_data(config, message["data"], message["last"])
             response = res.to_bytes(1, byteorder=sys.byteorder)
             logger.debug(f"Sending response {res}")
             socket.send(response)
+            socket.recv()
+            socket.send(out.encode())
+            write_stdout_log(script_stdout_log, out)
             if message["last"] and config:
                 scripts_called = getattr(config, 'scripts_called', [])
                 logger.debug(f'scripts_called: {scripts_called}')

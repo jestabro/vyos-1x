@@ -67,6 +67,8 @@ void timer_handler(int);
 
 double get_posix_clock_time(void);
 
+static char * s_recv_string (void *);
+
 int main(int argc, char* argv[])
 {
     // string for node data: conf_mode script and tagnode, if applicable
@@ -118,32 +120,35 @@ int main(int argc, char* argv[])
     zmq_send(requester, string_node_data_msg, strlen(string_node_data_msg), 0);
     zmq_recv(requester, error_code, 1, 0);
     debug_print("Received node data receipt\n");
-
-    int err = (int)error_code[0];
+    zmq_send(requester, "ack", 3, 0);
+    char *out = s_recv_string(requester);
+    printf(out);
 
     free(string_node_data_msg);
+    free(out);
 
-    zmq_close(requester);
-    zmq_ctx_destroy(context);
+    int err = (int)error_code[0];
+    int ret = 0;
 
     if (err & PASS) {
         debug_print("Received PASS\n");
-        int ret = pass_through(argv, ex_index);
-        return ret;
+        ret = pass_through(argv, ex_index);
     }
 
     if (err & ERROR_DAEMON) {
         debug_print("Received ERROR_DAEMON\n");
-        int ret = pass_through(argv, ex_index);
-        return ret;
+        ret = pass_through(argv, ex_index);
     }
 
     if (err & ERROR_COMMIT) {
         debug_print("Received ERROR_COMMIT\n");
-        return -1;
+        ret = -1;
     }
 
-    return 0;
+    zmq_close(requester);
+    zmq_ctx_destroy(context);
+
+    return ret;
 }
 
 int initialization(void* Requester)
@@ -342,3 +347,17 @@ double get_posix_clock_time(void)
 double get_posix_clock_time(void)
 {return (double)0;}
 #endif
+
+//  Receive string from socket and convert into C string
+//  Chops string at 255 chars, if it's longer
+static char *
+s_recv_string (void *socket) {
+    char buffer[256];
+    int size = zmq_recv(socket, buffer, 255, 0);
+    if (size == -1)
+        return NULL;
+    if (size > 255)
+        size = 255;
+    buffer[size] = '\0';
+    return strndup(buffer, sizeof(buffer)-1);
+}
