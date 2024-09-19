@@ -67,7 +67,7 @@ void timer_handler(int);
 
 double get_posix_clock_time(void);
 
-static char * s_recv_string (void *);
+static char * s_recv_string (void *, int);
 
 int main(int argc, char* argv[])
 {
@@ -120,12 +120,21 @@ int main(int argc, char* argv[])
     zmq_send(requester, string_node_data_msg, strlen(string_node_data_msg), 0);
     zmq_recv(requester, error_code, 1, 0);
     debug_print("Received node data receipt\n");
-    zmq_send(requester, "ack", 3, 0);
-    char *out = s_recv_string(requester);
-    printf(out);
+
+    char msg_size_b[4];
+    zmq_send(requester, "msg_size", 8, 0);
+    zmq_recv(requester, msg_size_b, 4, 0);
+    int msg_size = *(int *)msg_size_b;
+    debug_print("msg_size: %d\n", msg_size);
+
+    if (msg_size > 0) {
+        zmq_send(requester, "send", 4, 0);
+        char *msg = s_recv_string(requester, msg_size);
+        printf(msg);
+        free(msg);
+    }
 
     free(string_node_data_msg);
-    free(out);
 
     int err = (int)error_code[0];
     int ret = 0;
@@ -351,14 +360,14 @@ double get_posix_clock_time(void)
 //  Receive string from socket and convert into C string
 //  Chops string at 255 chars, if it's longer
 static char *
-s_recv_string (void *socket) {
+s_recv_string (void *socket, int bufsize) {
 //    char buffer[256];
-    char * buffer = (char *)malloc(256);
-    int size = zmq_recv(socket, buffer, 255, 0);
+    char * buffer = (char *)malloc(bufsize+1);
+    int size = zmq_recv(socket, buffer, bufsize, 0);
     if (size == -1)
         return NULL;
-    if (size > 255)
-        size = 255;
+    if (size > bufsize)
+        size = bufsize;
     buffer[size] = '\0';
     return buffer;
 //    return strndup(buffer, sizeof(buffer)-1);

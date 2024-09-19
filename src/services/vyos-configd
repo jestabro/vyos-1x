@@ -54,6 +54,7 @@ else:
     logger.setLevel(logging.INFO)
 
 SOCKET_PATH = "ipc:///run/vyos-configd.sock"
+MAX_MSG_SIZE = 65535
 
 # Response error codes
 R_SUCCESS = 1
@@ -246,11 +247,23 @@ def process_node_data(config, data, _last: bool = False) -> int:
 
 
 def send_result(sock, err, msg):
-    response = err.to_bytes(1, byteorder=sys.byteorder)
-    logger.debug(f"Sending response {err}")
-    sock.send(response)
-    _ = sock.recv()
-    sock.send(msg.encode())
+    msg_size = min(MAX_MSG_SIZE, len(msg)) if msg else 0
+
+    err_rep = err.to_bytes(1, byteorder=sys.byteorder)
+    logger.debug(f'Sending response {err}')
+    sock.send(err_rep)
+    # size req from vyshim client
+    size_req = sock.recv().decode()
+    logger.debug(f'Received request: {size_req}')
+    msg_size_rep = msg_size.to_bytes(4, byteorder=sys.byteorder)
+    sock.send(msg_size_rep)
+
+    if msg_size > 0:
+        # send req is sent from vyshim client only if msg_size > 0
+        send_req = sock.recv().decode()
+        logger.debug(f'Received request: {send_req}')
+        sock.send(msg.encode())
+
     write_stdout_log(script_stdout_log, msg)
 
 
