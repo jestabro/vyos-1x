@@ -41,12 +41,11 @@ def get_config(config=None):
     return d
 
 def verify(c):
-    Warning("JSE this is a warning")
+    if dict_search("some-tag-node.some1", c) is not None:
+        Warning("JSE this is a warning")
 
-    if dict_search("some-tag-node.some1", c) is None:
+    if dict_search("some-tag-node.some2", c) is not None:
         raise ConfigError('JSE this is a ConfigError')
-    else:
-        print("no, not found")
 
     return None
 
