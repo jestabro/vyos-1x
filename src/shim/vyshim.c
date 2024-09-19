@@ -352,12 +352,14 @@ double get_posix_clock_time(void)
 //  Chops string at 255 chars, if it's longer
 static char *
 s_recv_string (void *socket) {
-    char buffer[256];
+//    char buffer[256];
+    char * buffer = (char *)malloc(256);
     int size = zmq_recv(socket, buffer, 255, 0);
     if (size == -1)
         return NULL;
     if (size > 255)
         size = 255;
     buffer[size] = '\0';
-    return strndup(buffer, sizeof(buffer)-1);
+    return buffer;
+//    return strndup(buffer, sizeof(buffer)-1);
 }
