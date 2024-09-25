@@ -43,7 +43,8 @@ from vyos import ConfigError
 from vyos import airbag
 airbag.enable()
 
-config_file = '/etc/nginx/sites-enabled/default'
+server_file = '/etc/nginx/sites-enabled/default'
+conf_file = '/etc/nginx/conf.d/vyos.conf'
 systemd_override = r'/run/systemd/system/nginx.service.d/override.conf'
 cert_dir = '/run/nginx/certs'
 
@@ -140,7 +141,8 @@ def verify(https):
 
 def generate(https):
     if https is None:
-        for file in [systemd_service_api, config_file, systemd_override]:
+        for file in [systemd_service_api, server_file, systemd_override,
+                     conf_file]:
             if os.path.exists(file):
                 os.unlink(file)
         return None
@@ -185,7 +187,8 @@ def generate(https):
 
         https['certificates'].update(tmp_path)
 
-    render(config_file, 'https/nginx.default.j2', https)
+    render(server_file, 'https/nginx.default.j2', https)
+    render(conf_file, 'https/nginx.conf.j2', https)
     render(systemd_override, 'https/override.conf.j2', https)
     return None
 
