@@ -208,6 +208,9 @@ def initialization(socket):
     scripts_called = []
     setattr(config, 'scripts_called', scripts_called)
 
+    frr_config = frr.FRRConfig()
+    setattr(config, 'frr_config', frr_config)
+
     return config
 
 
@@ -336,5 +339,10 @@ if __name__ == '__main__':
             if message['last'] and config:
                 scripts_called = getattr(config, 'scripts_called', [])
                 logger.debug(f'scripts_called: {scripts_called}')
+
+                if hasattr(config, 'frr_config'):
+                    frr_cfg = getattr(config, 'frr_config')
+                    # XXX: need to define/collect 'all-the-configs'
+                    frr_cfg.commit_configuration('all-the-configs')
         else:
             logger.critical(f'Unexpected message: {message}')

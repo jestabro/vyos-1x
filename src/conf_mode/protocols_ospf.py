@@ -50,6 +50,9 @@ def get_config(config=None):
     ospf = conf.get_config_dict(base, key_mangling=('-', '_'),
                                 get_first_key=True)
 
+    if hasattr(conf, 'frr_config'):
+        ospf['frr_config'] = getattr(conf, 'frr_config')
+
     # Assign the name of our VRF context. This MUST be done before the return
     # statement below, else on deletion we will delete the default instance
     # instead of the VRF instance.
@@ -255,7 +258,7 @@ def apply(ospf):
     ospf_daemon = 'ospfd'
 
     # Save original configuration prior to starting any commit actions
-    frr_cfg = frr.FRRConfig()
+    frr_cfg = ospf['frr_config'] if 'frr_config' in ospf elsr frr.FRRConfig()
 
     # Generate empty helper string which can be ammended to FRR commands, it
     # will be either empty (default VRF) or contain the "vrf <name" statement
@@ -275,7 +278,9 @@ def apply(ospf):
     if 'frr_ospfd_config' in ospf:
         frr_cfg.add_before(frr.default_add_before, ospf['frr_ospfd_config'])
 
-    frr_cfg.commit_configuration(ospf_daemon)
+    if 'frr_config' not in ospf:
+        frr_cfg.commit_configuration(ospf_daemon)
+    # else we will call once in vyos-configd
 
     return None
 
