@@ -522,6 +522,8 @@ start ()
 
     disabled system_config || system_config
 
+    systemctl start vyconfd.service
+
     for s in ${subinit[@]} ; do
     if ! disabled $s; then
         log_progress_msg $s
@@ -563,6 +565,8 @@ stop()
     log_action_begin_msg "Un-mounting VyOS Config"
     umount ${vyatta_configdir}
     log_action_end_msg $?
+
+    systemctl stop vyconfd.service
 
     systemctl stop frr.service
 
