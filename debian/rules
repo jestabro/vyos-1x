@@ -91,7 +91,8 @@ override_dh_auto_install:
 
 	# Install data files
 	mkdir -p $(DIR)/$(VYCONF_REFTREE_DIR)
-	cp -r data/reftree.cache $(DIR)/$(VYCONF_REFTREE_DIR)
+	cp -r data/vyos_1x.cache $(DIR)/$(VYCONF_REFTREE_DIR)
+	cp -r data/vyos_1x.cache $(DIR)/$(VYCONF_REFTREE_DIR)/reftree.cache
 	mkdir -p $(DIR)/$(VYOS_DATA_DIR)
 	cp -r data/* $(DIR)/$(VYOS_DATA_DIR)
 	# Remove j2lint comments / linter configuration which would insert additional new-lines
