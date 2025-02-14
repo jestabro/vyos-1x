@@ -16,6 +16,8 @@ Build-Depends:
 # For generating command definitions
   python3-lxml,
   python3-xmltodict,
+# For generating serialization functions
+  protobuf-compiler,
 # For running tests
   python3-coverage,
   python3-hurry.filesize,
