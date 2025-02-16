@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import signal
+import socket
+from dataclasses import dataclass
+from pathlib import Path
+from time import sleep
+from typing import Optional, List
+
+from vyos.proto import vycall_pb2
+
+@dataclass
+class NodeData:
+    script_name: str
+    tag_node_value: str
+    argument: str
+
+@dataclass
+class Session:
+    session: Optional[str] = None
+    init: bool = False
+    node_list: List[NodeData] = None
+
+@dataclass
+class Request:
+    session: int
+    init: bool
+    word: str
+    pid: int
+
+@dataclass
+class Response:
+    output: str = ''
+
+def read_message(msg):
+#    with open('request.bin', 'rb') as f:
+
+    request = vycall_pb2.CommitEnvelope()
+    request.ParseFromString(msg)
+    request = request.commit
+    oneof_field = request.WhichOneof('msg')
+    print(f'JSE request type is: {type(request)}')
+    result = ''
+    match oneof_field:
+        case 'init':
+            print(request.init.dry_run)
+            result = 'Heard init\n'
+        case 'call':
+            print(request.call.script)
+            result = 'Call and response\n'
+    return result
+#        if oneof_field == 'word':
+#            print(request.word)
+#        if request.HasField('word'):
+#            print(request.word)
+#        request = vydispatch_pb2.Request.Word()
+#        request.ParseFromString(f.read())
+
+#    print(request.word)
+
+def write_message(case):
+    response = vycall_pb2.Result()
+    response.output = case
+    response.error = vycall_pb2.SUCCESS
+    encoded_data = response.SerializeToString()
+    byte_size = response.ByteSize()
+    print(f'JSE type of encoded_data: {type(encoded_data)}')
+    data_length = len(encoded_data)
+    print(f'JSE write length: {data_length}')
+    print(f'JSE ByteSize value: {byte_size}')
+    data_length_bytes = data_length.to_bytes(4)
+    arr = bytearray(data_length_bytes)
+    arr.extend(encoded_data)
+#    arr = bytearray(encoded_data)
+#    arr.extend(data_length_bytes)
+    arr_length = len(arr)
+    print(f'JSE extended write length: {arr_length}')
+#    print(f'JSE non-extended write length: {arr_length}')
+    
+    return arr
+
+
+def receive_message():
+    pass
+    
+
+def sig_handler(_signum, _frame):
+    print('stopping server')
+    raise KeyboardInterrupt
+
+def server_program():
+    # get the hostname
+    host = socket.gethostname()
+    port = 5000  # initiate port no above 1024
+
+
+    server_addr = '/run/vyos-commitd.sock'
+
+    server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
+
+    if os.path.exists(server_addr):
+        os.unlink(server_addr)
+    server_socket.bind(server_addr)
+    p = Path(server_addr)
+    p.chmod(0o775)
+
+    # configure how many client the server can listen simultaneously
+    server_socket.listen(2)
+    while True:
+        try:
+            print('JSE: waiting')
+            conn, address = server_socket.accept()  # accept new connection
+            if isinstance(address, str):
+                print('yes, it is a string')
+            if address.startswith('\0'):
+                print('yes, starts with null')
+                address = address[1:]
+
+            print(f'client connected from: {address}')
+            while True:
+                # receive data stream. it won't accept data packet greater than 1024 bytes
+                data_length = conn.recv(4)
+                if not data_length:
+                    print('JSE no data')
+                    # if data is not received break
+                    break
+                length = int.from_bytes(data_length)
+                print(f'JSE read length is {length}')
+                data = conn.recv(length)
+        #        data = conn.recv(length).decode()
+        #        data = conn.recv(1024)
+#                if not data:
+#                    print('JSE no data')
+                    # if data is not received break
+#                    break
+                result = read_message(data)
+                res = write_message(result)
+#                res = 137
+#                res = res.to_bytes(4)
+                print(f'JSE res: {res}')
+                conn.sendall(res)
+#                break
+#                sleep(2)
+        #        print("from connected user: " + str(data))
+        #        data = input(' -> ')
+        #        conn.send(data.encode())  # send data to the client
+
+            conn.close()  # close the connection
+        except KeyboardInterrupt:
+            print('heard KeyboardInterrupt')
+            break
+
+    print('JSE outside')
+    server_socket.close()
+    sys.exit(0)
+
+def main():
+    server_program()
+
+if __name__ == '__main__':
+    main()
+
