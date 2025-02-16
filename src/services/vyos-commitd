@@ -4,164 +4,170 @@ import os
 import sys
 import signal
 import socket
+import logging
 from dataclasses import dataclass
+from dataclasses import field
+from dataclasses import asdict
+from enum import IntEnum
 from pathlib import Path
-from time import sleep
-from typing import Optional, List
+
+from google.protobuf.json_format import MessageToDict
+from google.protobuf.json_format import ParseDict
+
+from vyos.config import Config
+# from vyos import ConfigError
 
 from vyos.proto import vycall_pb2
 
+
+class Error(IntEnum):
+    SUCCESS = vycall_pb2.SUCCESS
+    CONFIG_ERROR = vycall_pb2.CONFIG_ERROR
+    DAEMON_ERROR = vycall_pb2.DAEMON_ERROR
+    BACKGROUND = vycall_pb2.BACKGROUND
+
+
 @dataclass
-class NodeData:
-    script_name: str
-    tag_node_value: str
-    argument: str
+class Reply:
+    error: Error
+    out: str = ''
+
+
+@dataclass
+class Call:
+    script_name: str = None
+    tag_value: str = None
+    arg_value: str = None
+    reply: Reply = None
+
+    def set_reply(self, msg: str, err: Error):
+        self.reply = Reply(error=err, out=msg)
+
 
 @dataclass
 class Session:
-    session: Optional[str] = None
-    init: bool = False
-    node_list: List[NodeData] = None
+    session_id: str = ''
+    named_active: str = None
+    named_proposed: str = None
+    dry_run: bool = False
+    atomic: bool = False
+    background: bool = False
+    config: Config = None
+    calls: list[Call] = field(default_factory=list)
 
-@dataclass
-class Request:
-    session: int
-    init: bool
-    word: str
-    pid: int
 
-@dataclass
-class Response:
-    output: str = ''
+debug = True
 
-def read_message(msg):
-#    with open('request.bin', 'rb') as f:
+logger = logging.getLogger(__name__)
+logs_handler = logging.StreamHandler()
+logger.addHandler(logs_handler)
 
-    request = vycall_pb2.CommitEnvelope()
-    request.ParseFromString(msg)
-    request = request.commit
-    oneof_field = request.WhichOneof('msg')
-    print(f'JSE request type is: {type(request)}')
-    result = ''
-    match oneof_field:
-        case 'init':
-            print(request.init.dry_run)
-            result = 'Heard init\n'
-        case 'call':
-            print(request.call.script)
-            result = 'Call and response\n'
-    return result
-#        if oneof_field == 'word':
-#            print(request.word)
-#        if request.HasField('word'):
-#            print(request.word)
-#        request = vydispatch_pb2.Request.Word()
-#        request.ParseFromString(f.read())
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
 
-#    print(request.word)
+SOCKET_PATH = '/run/vyos-commitd.sock'
 
-def write_message(case):
-    response = vycall_pb2.Result()
-    response.output = case
-    response.error = vycall_pb2.SUCCESS
-    encoded_data = response.SerializeToString()
-    byte_size = response.ByteSize()
-    print(f'JSE type of encoded_data: {type(encoded_data)}')
-    data_length = len(encoded_data)
-    print(f'JSE write length: {data_length}')
-    print(f'JSE ByteSize value: {byte_size}')
-    data_length_bytes = data_length.to_bytes(4)
-    arr = bytearray(data_length_bytes)
+
+def msg_to_commit_data(msg: vycall_pb2.Commit) -> Session:
+    d = MessageToDict(msg, preserving_proto_field_name=True)
+    session = Session(**d)
+    session.calls = list(map(lambda x: Call(**x), session.calls))
+    return session
+
+
+def commit_data_to_msg(obj: Session) -> vycall_pb2.Commit:
+    msg = vycall_pb2.Commit()
+    msg = ParseDict(asdict(obj), msg, ignore_unknown_fields=True)
+    return msg
+
+
+def intialization(session: Session) -> Session:
+    return session
+
+
+def read_message(msg: bytes) -> Session:
+    """Read message into Session instance"""
+
+    message = vycall_pb2.Commit()
+    message.ParseFromString(msg)
+    session = msg_to_commit_data(message)
+
+    for i, call in enumerate(session.calls):
+        logger.info(call.script_name)
+        call.set_reply(f'{i}th script\n', Error.SUCCESS)
+
+    return session
+
+
+def write_reply(session: Session) -> bytearray:
+    """Serialize modified object to bytearray, prepending data length
+    header"""
+
+    reply = commit_data_to_msg(session)
+    encoded_data = reply.SerializeToString()
+    byte_size = reply.ByteSize()
+    length_bytes = byte_size.to_bytes(4)
+    arr = bytearray(length_bytes)
     arr.extend(encoded_data)
-#    arr = bytearray(encoded_data)
-#    arr.extend(data_length_bytes)
-    arr_length = len(arr)
-    print(f'JSE extended write length: {arr_length}')
-#    print(f'JSE non-extended write length: {arr_length}')
-    
+
     return arr
 
 
-def receive_message():
-    pass
-    
+def remove_if_exists(f: str):
+    try:
+        os.unlink(f)
+    except FileNotFoundError:
+        pass
+
 
 def sig_handler(_signum, _frame):
-    print('stopping server')
+    logger.info('stopping server')
     raise KeyboardInterrupt
 
-def server_program():
-    # get the hostname
-    host = socket.gethostname()
-    port = 5000  # initiate port no above 1024
 
-
-    server_addr = '/run/vyos-commitd.sock'
-
+def run_server():
+    logger.info('starting server')
     server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
 
-    if os.path.exists(server_addr):
-        os.unlink(server_addr)
-    server_socket.bind(server_addr)
-    p = Path(server_addr)
-    p.chmod(0o775)
+    remove_if_exists(SOCKET_PATH)
+    server_socket.bind(SOCKET_PATH)
+    Path(SOCKET_PATH).chmod(0o775)
 
-    # configure how many client the server can listen simultaneously
     server_socket.listen(2)
     while True:
         try:
-            print('JSE: waiting')
-            conn, address = server_socket.accept()  # accept new connection
-            if isinstance(address, str):
-                print('yes, it is a string')
-            if address.startswith('\0'):
-                print('yes, starts with null')
-                address = address[1:]
-
-            print(f'client connected from: {address}')
+            conn, _ = server_socket.accept()
+            logger.debug('connection accepted')
             while True:
-                # receive data stream. it won't accept data packet greater than 1024 bytes
+                # receive size of data
                 data_length = conn.recv(4)
                 if not data_length:
-                    print('JSE no data')
-                    # if data is not received break
+                    logger.debug('no data')
+                    # if no data break
                     break
-                length = int.from_bytes(data_length)
-                print(f'JSE read length is {length}')
-                data = conn.recv(length)
-        #        data = conn.recv(length).decode()
-        #        data = conn.recv(1024)
-#                if not data:
-#                    print('JSE no data')
-                    # if data is not received break
-#                    break
-                result = read_message(data)
-                res = write_message(result)
-#                res = 137
-#                res = res.to_bytes(4)
-                print(f'JSE res: {res}')
-                conn.sendall(res)
-#                break
-#                sleep(2)
-        #        print("from connected user: " + str(data))
-        #        data = input(' -> ')
-        #        conn.send(data.encode())  # send data to the client
 
-            conn.close()  # close the connection
+                length = int.from_bytes(data_length)
+                # receive data
+                data = conn.recv(length)
+
+                session = read_message(data)
+                reply = write_reply(session)
+                conn.sendall(reply)
+
+            conn.close()
+            logger.debug('connection closed')
+
         except KeyboardInterrupt:
-            print('heard KeyboardInterrupt')
             break
 
-    print('JSE outside')
     server_socket.close()
     sys.exit(0)
 
-def main():
-    server_program()
 
 if __name__ == '__main__':
-    main()
-
+    run_server()
