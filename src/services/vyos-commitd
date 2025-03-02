@@ -2,10 +2,15 @@
 
 import os
 import sys
+import json
 import signal
 import socket
+import typing
 import logging
+import tomli
+import importlib.util
 from dataclasses import dataclass
+from dataclasses import fields
 from dataclasses import field
 from dataclasses import asdict
 from enum import IntEnum
@@ -14,6 +19,10 @@ from pathlib import Path
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.json_format import ParseDict
 
+from vyos.defaults import directories
+from vyos.utils.boot import boot_configuration_complete
+from vyos.configsource import ConfigSourceCache
+from vyos.configsource import ConfigSourceError
 from vyos.config import Config
 # from vyos import ConfigError
 
@@ -56,6 +65,17 @@ class Session:
     calls: list[Call] = field(default_factory=list)
 
 
+@dataclass
+class ServerConf:
+    commitd_socket: str = ''
+    session_dir: str = ''
+    running_cache: str = ''
+    session_cache: str = ''
+
+
+server_conf = None
+SOCKET_PATH = None
+
 debug = True
 
 logger = logging.getLogger(__name__)
@@ -67,7 +87,60 @@ if debug:
 else:
     logger.setLevel(logging.INFO)
 
-SOCKET_PATH = '/run/vyos-commitd.sock'
+
+vyos_conf_scripts_dir = directories['conf_mode']
+commitd_include_file = os.path.join(directories['data'], 'configd-include.json')
+
+
+def key_name_from_file_name(f):
+    return os.path.splitext(f)[0]
+
+
+def module_name_from_key(k):
+    return k.replace('-', '_')
+
+
+def path_from_file_name(f):
+    return os.path.join(vyos_conf_scripts_dir, f)
+
+
+with open(commitd_include_file) as f:
+    try:
+        include = json.load(f)
+    except OSError as e:
+        logger.critical(f'configd include file error: {e}')
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        logger.critical(f'JSON load error: {e}')
+        sys.exit(1)
+
+
+# import conf_mode scripts
+(_, _, filenames) = next(iter(os.walk(vyos_conf_scripts_dir)))
+filenames.sort()
+
+load_filenames = [f for f in filenames if f in include]
+imports = [key_name_from_file_name(f) for f in load_filenames]
+module_names = [module_name_from_key(k) for k in imports]
+paths = [path_from_file_name(f) for f in load_filenames]
+to_load = list(zip(module_names, paths))
+
+modules = []
+
+for x in to_load:
+    spec = importlib.util.spec_from_file_location(x[0], x[1])
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    modules.append(module)
+
+conf_mode_scripts = dict(zip(imports, modules))
+
+
+def write_stdout_log(file_name, msg):
+    if boot_configuration_complete():
+        return
+    with open(file_name, 'a') as f:
+        f.write(msg)
 
 
 def msg_to_commit_data(msg: vycall_pb2.Commit) -> Session:
@@ -83,7 +156,39 @@ def commit_data_to_msg(obj: Session) -> vycall_pb2.Commit:
     return msg
 
 
-def intialization(session: Session) -> Session:
+def load_scripts():
+    pass
+
+
+def initialization(session: Session) -> Session:
+    global server_conf
+
+    try:
+        configsource = ConfigSourceCache(
+            running_config_cache=server_conf.running_cache,
+            session_config_cache=server_conf.session_cache,
+        )
+    except ConfigSourceError as e:
+        logger.critical(f'Failed to read config caches: {e}')
+
+    config = Config(config_source=configsource)
+
+    dependent_func: dict[str, list[typing.Callable]] = {}
+    setattr(config, 'dependent_func', dependent_func)
+
+    scripts_called = []
+    setattr(config, 'scripts_called', scripts_called)
+
+    session.config = config
+
+    return session
+
+
+def run_script(script_name: str, arg_value: str, config: Config) -> Reply:
+    return Reply(Error.SUCCESS, 'success')
+
+
+def process_node_data(session: Session) -> Session:
     return session
 
 
@@ -94,9 +199,11 @@ def read_message(msg: bytes) -> Session:
     message.ParseFromString(msg)
     session = msg_to_commit_data(message)
 
-    for i, call in enumerate(session.calls):
-        logger.info(call.script_name)
-        call.set_reply(f'{i}th script\n', Error.SUCCESS)
+    session = initialization(session)
+
+    #    for i, call in enumerate(session.calls):
+    #        logger.info(call.script_name)
+    #        call.set_reply(f'{i}th script\n', Error.SUCCESS)
 
     return session
 
@@ -115,6 +222,27 @@ def write_reply(session: Session) -> bytearray:
     return arr
 
 
+def load_server_conf() -> ServerConf:
+    try:
+        conf_file = directories['vyconfd_conf']
+        with open(conf_file, 'rb') as f:
+            vyconfd_conf = tomli.load(f)
+
+    except Exception as e:
+        logger.critical(f'Failed to open the vyconfd.conf file {conf_file}: {e}')
+        sys.exit(1)
+
+    app = vyconfd_conf.get('appliance', {})
+
+    conf_data = {
+        k: v for k, v in app.items() if k in [_.name for _ in fields(ServerConf)]
+    }
+
+    server_conf = ServerConf(**conf_data)
+
+    return server_conf
+
+
 def remove_if_exists(f: str):
     try:
         os.unlink(f)
@@ -128,7 +256,14 @@ def sig_handler(_signum, _frame):
 
 
 def run_server():
+    global server_conf
+    global SOCKET_PATH
+
     logger.info('starting server')
+
+    server_conf = load_server_conf()
+    SOCKET_PATH = server_conf.commitd_socket
+
     server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
     signal.signal(signal.SIGTERM, sig_handler)
