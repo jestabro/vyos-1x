@@ -62,8 +62,11 @@ class Session:
     atomic: bool = False
     background: bool = False
     config: Config = None
+    session_reply: Reply = None
     calls: list[Call] = field(default_factory=list)
 
+    def set_session_reply(self, msg: str, err: Error):
+        self.session_reply = Reply(error=err, out=msg)
 
 @dataclass
 class ServerConf:
