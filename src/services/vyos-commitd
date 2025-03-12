@@ -3,12 +3,15 @@
 import os
 import sys
 import json
+import tomli
 import signal
 import socket
 import typing
 import logging
-import tomli
+import traceback
 import importlib.util
+import io
+from contextlib import redirect_stdout
 from dataclasses import dataclass
 from dataclasses import fields
 from dataclasses import field
@@ -24,7 +27,7 @@ from vyos.utils.boot import boot_configuration_complete
 from vyos.configsource import ConfigSourceCache
 from vyos.configsource import ConfigSourceError
 from vyos.config import Config
-# from vyos import ConfigError
+from vyos import ConfigError
 
 from vyos.proto import vycall_pb2
 
@@ -68,6 +71,7 @@ class Session:
     def set_session_reply(self, msg: str, err: Error):
         self.session_reply = Reply(error=err, out=msg)
 
+
 @dataclass
 class ServerConf:
     commitd_socket: str = ''
@@ -78,6 +82,7 @@ class ServerConf:
 
 server_conf = None
 SOCKET_PATH = None
+conf_mode_scripts = None
 
 debug = True
 
@@ -107,36 +112,38 @@ def path_from_file_name(f):
     return os.path.join(vyos_conf_scripts_dir, f)
 
 
-with open(commitd_include_file) as f:
-    try:
-        include = json.load(f)
-    except OSError as e:
-        logger.critical(f'configd include file error: {e}')
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        logger.critical(f'JSON load error: {e}')
-        sys.exit(1)
+def load_conf_mode_scripts():
+    with open(commitd_include_file) as f:
+        try:
+            include = json.load(f)
+        except OSError as e:
+            logger.critical(f'configd include file error: {e}')
+            sys.exit(1)
+        except json.JSONDecodeError as e:
+            logger.critical(f'JSON load error: {e}')
+            sys.exit(1)
 
+    # import conf_mode scripts
+    (_, _, filenames) = next(iter(os.walk(vyos_conf_scripts_dir)))
+    filenames.sort()
 
-# import conf_mode scripts
-(_, _, filenames) = next(iter(os.walk(vyos_conf_scripts_dir)))
-filenames.sort()
+    load_filenames = [f for f in filenames if f in include]
+    imports = [key_name_from_file_name(f) for f in load_filenames]
+    module_names = [module_name_from_key(k) for k in imports]
+    paths = [path_from_file_name(f) for f in load_filenames]
+    to_load = list(zip(module_names, paths))
 
-load_filenames = [f for f in filenames if f in include]
-imports = [key_name_from_file_name(f) for f in load_filenames]
-module_names = [module_name_from_key(k) for k in imports]
-paths = [path_from_file_name(f) for f in load_filenames]
-to_load = list(zip(module_names, paths))
+    modules = []
 
-modules = []
+    for x in to_load:
+        spec = importlib.util.spec_from_file_location(x[0], x[1])
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        modules.append(module)
 
-for x in to_load:
-    spec = importlib.util.spec_from_file_location(x[0], x[1])
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    modules.append(module)
+    scripts = dict(zip(imports, modules))
 
-conf_mode_scripts = dict(zip(imports, modules))
+    return scripts
 
 
 def write_stdout_log(file_name, msg):
@@ -172,7 +179,10 @@ def initialization(session: Session) -> Session:
             session_config_cache=server_conf.session_cache,
         )
     except ConfigSourceError as e:
-        logger.critical(f'Failed to read config caches: {e}')
+        fail_msg = f'Failed to read config caches: {e}'
+        logger.critical(fail_msg)
+        session.set_session_reply(fail_msg, Error.DAEMON_ERROR)
+        return session
 
     config = Config(config_source=configsource)
 
@@ -182,16 +192,76 @@ def initialization(session: Session) -> Session:
     scripts_called = []
     setattr(config, 'scripts_called', scripts_called)
 
+    dry_run = False
+    setattr(config, 'dry_run', dry_run)
+
     session.config = config
 
     return session
 
 
-def run_script(script_name: str, arg_value: str, config: Config) -> Reply:
-    return Reply(Error.SUCCESS, 'success')
+def run_script(script_name: str, config: Config, args: list) -> tuple[str, Error]:
+    # pylint: disable=broad-exception-caught
+
+    script = conf_mode_scripts[script_name]
+    script.argv = args
+    config.set_level([])
+    try:
+        c = script.get_config(config)
+        script.verify(c)
+        script.generate(c)
+        script.apply(c)
+    except ConfigError as e:
+        logger.error(e)
+        return str(e), Error.CONFIG_ERROR
+    except Exception:
+        tb = traceback.format_exc()
+        logger.error(tb)
+        return tb, Error.CONFIG_ERROR
+
+    return '', Error.SUCCESS
 
 
-def process_node_data(session: Session) -> Session:
+def process_call_data(call: Call, config: Config) -> None:
+    script_name = key_name_from_file_name(call.script_name)
+
+    if script_name not in conf_mode_scripts:
+        fail_msg = f'No such script: {call.script_name}'
+        logger.critical(fail_msg)
+        call.set_reply(fail_msg, Error.CONFIG_ERROR)
+        return
+
+    config.dependency_list.clear()
+
+    tag_value = call.tag_value if call.tag_value is not None else ''
+    os.environ['VYOS_TAGNODE_VALUE'] = tag_value
+
+    args = call.arg_value.split() if call.arg_value else []
+    args.insert(0, f'{script_name}.py')
+
+    tag_ext = f'_{tag_value}' if tag_value else ''
+    script_record = f'{script_name}{tag_ext}'
+    scripts_called = getattr(config, 'scripts_called', [])
+    scripts_called.append(script_record)
+
+    with redirect_stdout(io.StringIO()) as o:
+        err_out, err = run_script(script_name, config, args)
+    amb_out = o.getvalue()
+    o.close()
+
+    out = amb_out + err_out
+
+    call.set_reply(out, err)
+
+
+def process_session_data(session: Session) -> Session:
+    if session.session_reply is not None:
+        return session
+
+    config = session.config
+    for call in session.calls:
+        process_call_data(call, config)
+
     return session
 
 
@@ -203,10 +273,7 @@ def read_message(msg: bytes) -> Session:
     session = msg_to_commit_data(message)
 
     session = initialization(session)
-
-    #    for i, call in enumerate(session.calls):
-    #        logger.info(call.script_name)
-    #        call.set_reply(f'{i}th script\n', Error.SUCCESS)
+    session = process_session_data(session)
 
     return session
 
@@ -226,6 +293,7 @@ def write_reply(session: Session) -> bytearray:
 
 
 def load_server_conf() -> ServerConf:
+    conf_file = None
     try:
         conf_file = directories['vyconfd_conf']
         with open(conf_file, 'rb') as f:
@@ -261,11 +329,13 @@ def sig_handler(_signum, _frame):
 def run_server():
     global server_conf
     global SOCKET_PATH
+    global conf_mode_scripts
 
     logger.info('starting server')
 
     server_conf = load_server_conf()
     SOCKET_PATH = server_conf.commitd_socket
+    conf_mode_scripts = load_conf_mode_scripts()
 
     server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
