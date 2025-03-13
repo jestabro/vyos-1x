@@ -32,28 +32,21 @@ from vyos import ConfigError
 from vyos.proto import vycall_pb2
 
 
-class Error(IntEnum):
-    SUCCESS = vycall_pb2.SUCCESS
-    CONFIG_ERROR = vycall_pb2.CONFIG_ERROR
-    DAEMON_ERROR = vycall_pb2.DAEMON_ERROR
-    BACKGROUND = vycall_pb2.BACKGROUND
-
-
 @dataclass
-class Reply:
-    error: Error
+class Status:
+    status: bool = False
     out: str = ''
 
 
 @dataclass
 class Call:
-    script_name: str = None
+    script_name: str = ''
     tag_value: str = None
     arg_value: str = None
-    reply: Reply = None
+    reply: Status = None
 
-    def set_reply(self, msg: str, err: Error):
-        self.reply = Reply(error=err, out=msg)
+    def set_reply(self, status: bool, msg: str):
+        self.reply = Status(status=status, out=msg)
 
 
 @dataclass
@@ -65,11 +58,11 @@ class Session:
     atomic: bool = False
     background: bool = False
     config: Config = None
-    session_reply: Reply = None
+    init: Status = None
     calls: list[Call] = field(default_factory=list)
 
-    def set_session_reply(self, msg: str, err: Error):
-        self.session_reply = Reply(error=err, out=msg)
+    def set_init(self, status: bool, msg: str):
+        self.init = Status(status=status, out=msg)
 
 
 @dataclass
@@ -155,19 +148,22 @@ def write_stdout_log(file_name, msg):
 
 def msg_to_commit_data(msg: vycall_pb2.Commit) -> Session:
     d = MessageToDict(msg, preserving_proto_field_name=True)
+
+    # wrap in dataclasses
     session = Session(**d)
+    session.init = Status(**session.init) if session.init else None
     session.calls = list(map(lambda x: Call(**x), session.calls))
+    for call in session.calls:
+        call.reply = Status(**call.reply) if call.reply else None
+
     return session
 
 
 def commit_data_to_msg(obj: Session) -> vycall_pb2.Commit:
     msg = vycall_pb2.Commit()
     msg = ParseDict(asdict(obj), msg, ignore_unknown_fields=True)
+
     return msg
-
-
-def load_scripts():
-    pass
 
 
 def initialization(session: Session) -> Session:
@@ -181,8 +177,10 @@ def initialization(session: Session) -> Session:
     except ConfigSourceError as e:
         fail_msg = f'Failed to read config caches: {e}'
         logger.critical(fail_msg)
-        session.set_session_reply(fail_msg, Error.DAEMON_ERROR)
+        session.set_init(False, fail_msg)
         return session
+    else:
+        session.set_init(True, '')
 
     config = Config(config_source=configsource)
 
@@ -200,7 +198,7 @@ def initialization(session: Session) -> Session:
     return session
 
 
-def run_script(script_name: str, config: Config, args: list) -> tuple[str, Error]:
+def run_script(script_name: str, config: Config, args: list) -> tuple[bool, str]:
     # pylint: disable=broad-exception-caught
 
     script = conf_mode_scripts[script_name]
@@ -213,13 +211,13 @@ def run_script(script_name: str, config: Config, args: list) -> tuple[str, Error
         script.apply(c)
     except ConfigError as e:
         logger.error(e)
-        return str(e), Error.CONFIG_ERROR
+        return False, str(e)
     except Exception:
         tb = traceback.format_exc()
         logger.error(tb)
-        return tb, Error.CONFIG_ERROR
+        return False, tb
 
-    return '', Error.SUCCESS
+    return True, ''
 
 
 def process_call_data(call: Call, config: Config) -> None:
@@ -228,7 +226,7 @@ def process_call_data(call: Call, config: Config) -> None:
     if script_name not in conf_mode_scripts:
         fail_msg = f'No such script: {call.script_name}'
         logger.critical(fail_msg)
-        call.set_reply(fail_msg, Error.CONFIG_ERROR)
+        call.set_reply(False, fail_msg)
         return
 
     config.dependency_list.clear()
@@ -245,13 +243,13 @@ def process_call_data(call: Call, config: Config) -> None:
     scripts_called.append(script_record)
 
     with redirect_stdout(io.StringIO()) as o:
-        err_out, err = run_script(script_name, config, args)
+        success, err_out = run_script(script_name, config, args)
     amb_out = o.getvalue()
     o.close()
 
     out = amb_out + err_out
 
-    call.set_reply(out, err)
+    call.set_reply(success, out)
 
 
 def process_session_data(session: Session) -> Session:
