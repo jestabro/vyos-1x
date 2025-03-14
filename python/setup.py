@@ -16,7 +16,11 @@ def packages(directory):
 
 
 class GenerateProto(build_py):
-    proto_path = directories['proto_path']
+    ver = os.environ.get('OCAML_VERSION')
+    if ver:
+        proto_path = f'/opt/opam/{ver}/share/vyconf'
+    else:
+        proto_path = directories['proto_path']
 
     def run(self):
         # find all .proto files in vyconf proto_path
