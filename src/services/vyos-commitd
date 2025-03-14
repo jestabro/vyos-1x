@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
-
+#
+# Copyright (C) 2025 VyOS maintainers and contributors
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or later as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 import os
 import sys
 import json
-import tomli
 import signal
 import socket
 import typing
@@ -16,8 +30,9 @@ from dataclasses import dataclass
 from dataclasses import fields
 from dataclasses import field
 from dataclasses import asdict
-from enum import IntEnum
 from pathlib import Path
+
+import tomli
 
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.json_format import ParseDict
@@ -34,7 +49,7 @@ from vyos.proto import vycall_pb2
 
 @dataclass
 class Status:
-    status: bool = False
+    success: bool = False
     out: str = ''
 
 
@@ -45,12 +60,14 @@ class Call:
     arg_value: str = None
     reply: Status = None
 
-    def set_reply(self, status: bool, msg: str):
-        self.reply = Status(status=status, out=msg)
+    def set_reply(self, success: bool, out: str):
+        self.reply = Status(success=success, out=out)
 
 
 @dataclass
 class Session:
+    # pylint: disable=too-many-instance-attributes
+
     session_id: str = ''
     named_active: str = None
     named_proposed: str = None
@@ -61,8 +78,8 @@ class Session:
     init: Status = None
     calls: list[Call] = field(default_factory=list)
 
-    def set_init(self, status: bool, msg: str):
-        self.init = Status(status=status, out=msg)
+    def set_init(self, success: bool, out: str):
+        self.init = Status(success=success, out=out)
 
 
 @dataclass
@@ -120,6 +137,8 @@ def load_conf_mode_scripts():
     (_, _, filenames) = next(iter(os.walk(vyos_conf_scripts_dir)))
     filenames.sort()
 
+    # this is redundant, as all scripts are currently in the include file;
+    # leave it for future-proofing
     load_filenames = [f for f in filenames if f in include]
     imports = [key_name_from_file_name(f) for f in load_filenames]
     module_names = [module_name_from_key(k) for k in imports]
@@ -139,6 +158,7 @@ def load_conf_mode_scripts():
     return scripts
 
 
+# XXX: to do
 def write_stdout_log(file_name, msg):
     if boot_configuration_complete():
         return
@@ -147,6 +167,8 @@ def write_stdout_log(file_name, msg):
 
 
 def msg_to_commit_data(msg: vycall_pb2.Commit) -> Session:
+    # pylint: disable=no-member
+
     d = MessageToDict(msg, preserving_proto_field_name=True)
 
     # wrap in dataclasses
@@ -160,6 +182,8 @@ def msg_to_commit_data(msg: vycall_pb2.Commit) -> Session:
 
 
 def commit_data_to_msg(obj: Session) -> vycall_pb2.Commit:
+    # pylint: disable=no-member
+
     msg = vycall_pb2.Commit()
     msg = ParseDict(asdict(obj), msg, ignore_unknown_fields=True)
 
@@ -167,8 +191,6 @@ def commit_data_to_msg(obj: Session) -> vycall_pb2.Commit:
 
 
 def initialization(session: Session) -> Session:
-    global server_conf
-
     try:
         configsource = ConfigSourceCache(
             running_config_cache=server_conf.running_cache,
@@ -179,8 +201,8 @@ def initialization(session: Session) -> Session:
         logger.critical(fail_msg)
         session.set_init(False, fail_msg)
         return session
-    else:
-        session.set_init(True, '')
+
+    session.set_init(True, '')
 
     config = Config(config_source=configsource)
 
@@ -253,7 +275,7 @@ def process_call_data(call: Call, config: Config) -> None:
 
 
 def process_session_data(session: Session) -> Session:
-    if session.session_reply is not None:
+    if session.init is None or not session.init.success:
         return session
 
     config = session.config
@@ -266,7 +288,7 @@ def process_session_data(session: Session) -> Session:
 def read_message(msg: bytes) -> Session:
     """Read message into Session instance"""
 
-    message = vycall_pb2.Commit()
+    message = vycall_pb2.Commit() # pylint: disable=no-member
     message.ParseFromString(msg)
     session = msg_to_commit_data(message)
 
@@ -291,6 +313,8 @@ def write_reply(session: Session) -> bytearray:
 
 
 def load_server_conf() -> ServerConf:
+    # pylint: disable=broad-exception-caught
+
     conf_file = None
     try:
         conf_file = directories['vyconfd_conf']
@@ -307,9 +331,9 @@ def load_server_conf() -> ServerConf:
         k: v for k, v in app.items() if k in [_.name for _ in fields(ServerConf)]
     }
 
-    server_conf = ServerConf(**conf_data)
+    conf = ServerConf(**conf_data)
 
-    return server_conf
+    return conf
 
 
 def remove_if_exists(f: str):
@@ -325,6 +349,8 @@ def sig_handler(_signum, _frame):
 
 
 def run_server():
+    # pylint: disable=global-statement
+
     global server_conf
     global SOCKET_PATH
     global conf_mode_scripts
