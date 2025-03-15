@@ -184,6 +184,9 @@ def msg_to_commit_data(msg: vycall_pb2.Commit) -> Session:
 def commit_data_to_msg(obj: Session) -> vycall_pb2.Commit:
     # pylint: disable=no-member
 
+    # avoid asdict attempt of deepcopy on Config obj
+    obj.config = None
+
     msg = vycall_pb2.Commit()
     msg = ParseDict(asdict(obj), msg, ignore_unknown_fields=True)
 
@@ -191,10 +194,14 @@ def commit_data_to_msg(obj: Session) -> vycall_pb2.Commit:
 
 
 def initialization(session: Session) -> Session:
+    running_cache = os.path.join(server_conf.session_dir,
+                                 server_conf.running_cache)
+    session_cache = os.path.join(server_conf.session_dir,
+                                 server_conf.session_cache)
     try:
         configsource = ConfigSourceCache(
-            running_config_cache=server_conf.running_cache,
-            session_config_cache=server_conf.session_cache,
+            running_config_cache=running_cache,
+            session_config_cache=session_cache,
         )
     except ConfigSourceError as e:
         fail_msg = f'Failed to read config caches: {e}'
@@ -313,19 +320,19 @@ def write_reply(session: Session) -> bytearray:
 
 
 def load_server_conf() -> ServerConf:
+    # pylint: disable=import-outside-toplevel
     # pylint: disable=broad-exception-caught
+    from vyos.defaults import vyconfd_conf
 
-    conf_file = None
     try:
-        conf_file = directories['vyconfd_conf']
-        with open(conf_file, 'rb') as f:
-            vyconfd_conf = tomli.load(f)
+        with open(vyconfd_conf, 'rb') as f:
+            vyconfd_conf_d = tomli.load(f)
 
     except Exception as e:
-        logger.critical(f'Failed to open the vyconfd.conf file {conf_file}: {e}')
+        logger.critical(f'Failed to open the vyconfd.conf file {vyconfd_conf}: {e}')
         sys.exit(1)
 
-    app = vyconfd_conf.get('appliance', {})
+    app = vyconfd_conf_d.get('appliance', {})
 
     conf_data = {
         k: v for k, v in app.items() if k in [_.name for _ in fields(ServerConf)]
