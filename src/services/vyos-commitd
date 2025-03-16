@@ -42,6 +42,8 @@ from vyos.utils.boot import boot_configuration_complete
 from vyos.configsource import ConfigSourceCache
 from vyos.configsource import ConfigSourceError
 from vyos.config import Config
+from vyos.frrender import FRRender
+from vyos.frrender import get_frrender_dict
 from vyos import ConfigError
 
 from vyos.proto import vycall_pb2
@@ -93,6 +95,7 @@ class ServerConf:
 server_conf = None
 SOCKET_PATH = None
 conf_mode_scripts = None
+frr = None
 
 debug = True
 
@@ -249,7 +252,9 @@ def run_script(script_name: str, config: Config, args: list) -> tuple[bool, str]
     return True, ''
 
 
-def process_call_data(call: Call, config: Config) -> None:
+def process_call_data(call: Call, config: Config, last: bool = False) -> None:
+    # pylint: disable=too-many-locals
+
     script_name = key_name_from_file_name(call.script_name)
 
     if script_name not in conf_mode_scripts:
@@ -271,6 +276,10 @@ def process_call_data(call: Call, config: Config) -> None:
     scripts_called = getattr(config, 'scripts_called', [])
     scripts_called.append(script_record)
 
+    if last:
+        scripts_called = getattr(config, 'scripts_called', [])
+        logger.debug(f'scripts_called: {scripts_called}')
+
     with redirect_stdout(io.StringIO()) as o:
         success, err_out = run_script(script_name, config, args)
     amb_out = o.getvalue()
@@ -280,14 +289,22 @@ def process_call_data(call: Call, config: Config) -> None:
 
     call.set_reply(success, out)
 
+    if last and success:
+        tmp = get_frrender_dict(config)
+        if frr.generate(tmp):
+            # only apply a new FRR configuration if anything changed
+            # in comparison to the previous applied configuration
+            frr.apply()
+
 
 def process_session_data(session: Session) -> Session:
     if session.init is None or not session.init.success:
         return session
 
     config = session.config
-    for call in session.calls:
-        process_call_data(call, config)
+    len_calls = len(session.calls)
+    for index, call in enumerate(session.calls):
+        process_call_data(call, config, last=len_calls == index + 1)
 
     return session
 
@@ -361,6 +378,7 @@ def run_server():
     global server_conf
     global SOCKET_PATH
     global conf_mode_scripts
+    global frr
 
     logger.info('starting server')
 
@@ -376,6 +394,9 @@ def run_server():
     remove_if_exists(SOCKET_PATH)
     server_socket.bind(SOCKET_PATH)
     Path(SOCKET_PATH).chmod(0o775)
+
+    # We only need one long-lived instance of FRRender
+    frr = FRRender()
 
     server_socket.listen(2)
     while True:
