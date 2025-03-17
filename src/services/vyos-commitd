@@ -17,6 +17,7 @@
 #
 import os
 import sys
+import grp
 import json
 import signal
 import socket
@@ -96,6 +97,8 @@ server_conf = None
 SOCKET_PATH = None
 conf_mode_scripts = None
 frr = None
+
+CFG_GROUP = 'vyattacfg'
 
 script_stdout_log = '/tmp/vyos-commitd-script-stdout'
 
@@ -286,10 +289,6 @@ def process_call_data(call: Call, config: Config, last: bool = False) -> None:
     scripts_called = getattr(config, 'scripts_called', [])
     scripts_called.append(script_record)
 
-    if last:
-        scripts_called = getattr(config, 'scripts_called', [])
-        logger.debug(f'scripts_called: {scripts_called}')
-
     with redirect_stdout(io.StringIO()) as o:
         success, err_out = run_script(script_name, config, args)
     amb_out = o.getvalue()
@@ -300,6 +299,10 @@ def process_call_data(call: Call, config: Config, last: bool = False) -> None:
     call.set_reply(success, out)
 
     logger.info(f'[{script_name}] {out}')
+
+    if last:
+        scripts_called = getattr(config, 'scripts_called', [])
+        logger.debug(f'scripts_called: {scripts_called}')
 
     if last and success:
         tmp = get_frrender_dict(config)
@@ -394,16 +397,19 @@ def run_server():
     global conf_mode_scripts
     global frr
 
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
+
     logger.info('starting server')
 
     server_conf = load_server_conf()
     SOCKET_PATH = server_conf.commitd_socket
     conf_mode_scripts = load_conf_mode_scripts()
 
-    server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    cfg_group = grp.getgrnam(CFG_GROUP)
+    os.setgid(cfg_group.gr_gid)
 
-    signal.signal(signal.SIGTERM, sig_handler)
-    signal.signal(signal.SIGINT, sig_handler)
+    server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
     remove_if_exists(SOCKET_PATH)
     server_socket.bind(SOCKET_PATH)
