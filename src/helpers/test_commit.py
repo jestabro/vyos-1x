@@ -19,6 +19,7 @@
 
 from pathlib import Path
 from argparse import ArgumentParser
+from datetime import datetime
 
 from vyos.configtree import ConfigTree
 from vyos.configtree import test_commit
@@ -41,4 +42,8 @@ proposed_arg = args.proposed_config
 active = ConfigTree(Path(active_arg).read_text())
 proposed = ConfigTree(Path(proposed_arg).read_text())
 
+
+time_begin_commit = datetime.now()
 test_commit(active, proposed)
+time_end_commit = datetime.now()
+print(f'commit time: {time_end_commit - time_begin_commit}')
