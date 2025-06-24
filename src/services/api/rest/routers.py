@@ -1,4 +1,4 @@
-# Copyright 2024 VyOS maintainers and contributors <maintainers@vyos.io>
+# Copyright 2024-2025 VyOS maintainers and contributors <maintainers@vyos.io>
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -564,7 +564,7 @@ def config_file_op(data: ConfigFileModel, background_tasks: BackgroundTasks):
                 case 'load':
                     session.migrate_and_load_config(path)
                 case 'merge':
-                    session.merge_config(path)
+                    session.merge_config(path, destructive=data.destructive)
 
             config = Config(session_env=env)
             d = get_config_diff(config)
