@@ -564,24 +564,29 @@ def config_file_op(data: ConfigFileModel, background_tasks: BackgroundTasks):
                 case 'load':
                     session.migrate_and_load_config(path)
                 case 'merge':
-                    session.merge_config(path, destructive=data.destructive)
+                    out = session.merge_config(path, destructive=data.destructive)
+                    LOG.info(f'JSE out is {out}')
+                    msg = msg + out if msg else out
 
-            config = Config(session_env=env)
-            d = get_config_diff(config)
+#            config = Config(session_env=env)
+#            d = get_config_diff(config)
 
-            if data.confirm_time:
-                out = session.commit_confirm(minutes=data.confirm_time)
-                msg = msg + out if msg else out
-                env['IN_COMMIT_CONFIRM'] = 't'
+#            if data.confirm_time:
+#                out = session.commit_confirm(minutes=data.confirm_time)
+#                msg = msg + out if msg else out
+#                env['IN_COMMIT_CONFIRM'] = 't'
 
-            if d.is_node_changed(['service', 'https']):
-                if data.confirm_time:
-                    background_tasks.add_task(call_commit_confirm, state)
-                else:
+#            if d.is_node_changed(['service', 'https']):
+#                if data.confirm_time:
+#                    background_tasks.add_task(call_commit_confirm, state)
+#                else:
                     background_tasks.add_task(call_commit, state)
-                out = self_ref_msg
-                msg = msg + out if msg else out
+#                out = self_ref_msg
+#                msg = msg + out if msg else out
+            if False:
+                pass
             else:
+                LOG.info('JSE running session.commit')
                 out = session.commit()
                 msg = msg + out if msg else out
         elif op == 'confirm':
