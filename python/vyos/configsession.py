@@ -182,8 +182,9 @@ class ConfigSession(object):
         self.__run_command([CLI_SHELL_API, 'setupSession'])
 
         if vyconf_backend() and boot_configuration_complete():
-            self._vyconf_session = VyconfSession(pid=session_id,
-                                                 on_error=ConfigSessionError)
+            self._vyconf_session = VyconfSession(
+                pid=session_id, on_error=ConfigSessionError
+            )
         else:
             self._vyconf_session = None
 
@@ -364,8 +365,13 @@ class ConfigSession(object):
         return out
 
     def merge_config(self, file_path, destructive=False):
-        destr = ['--destructive'] if destructive else []
-        out = self.__run_command(MERGE_CONFIG + [file_path] + destr)
+        if self._vyconf_session is None:
+            destr = ['--destructive'] if destructive else []
+            out = self.__run_command(MERGE_CONFIG + [file_path] + destr)
+        else:
+            out, _ = self._vyconf_session.merge_config(
+                file=file_path, destructive=destructive
+            )
 
         return out
 
