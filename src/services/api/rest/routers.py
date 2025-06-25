@@ -568,6 +568,9 @@ def config_file_op(data: ConfigFileModel, background_tasks: BackgroundTasks):
                     LOG.info(f'JSE out is {out}')
                     msg = msg + out if msg else out
 
+            pid = env.get('CONFIGSESSION_PID', 'nope')
+            LOG.info(f'JSE config session pid id {pid}')
+
 #            config = Config(session_env=env)
 #            d = get_config_diff(config)
 
@@ -580,11 +583,11 @@ def config_file_op(data: ConfigFileModel, background_tasks: BackgroundTasks):
 #                if data.confirm_time:
 #                    background_tasks.add_task(call_commit_confirm, state)
 #                else:
-                    background_tasks.add_task(call_commit, state)
+#                    background_tasks.add_task(call_commit, state)
 #                out = self_ref_msg
 #                msg = msg + out if msg else out
             if False:
-                pass
+                LOG.info('JSE not here')
             else:
                 LOG.info('JSE running session.commit')
                 out = session.commit()
@@ -603,7 +606,7 @@ def config_file_op(data: ConfigFileModel, background_tasks: BackgroundTasks):
             del env['IN_COMMIT_CONFIRM']
         lock.release()
 
-    return success(msg)
+    return success('JSE success msg ' + msg)
 
 
 @router.post('/image')
