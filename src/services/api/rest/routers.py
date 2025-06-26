@@ -571,7 +571,7 @@ def config_file_op(data: ConfigFileModel, background_tasks: BackgroundTasks):
             pid = env.get('CONFIGSESSION_PID', 'nope')
             LOG.info(f'JSE config session pid id {pid}')
 
-#            config = Config(session_env=env)
+            config = Config(session_env=env)
 #            d = get_config_diff(config)
 
 #            if data.confirm_time:
