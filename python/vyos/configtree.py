@@ -94,12 +94,12 @@ class ConfigTree(object):
         self.__to_commands.argtypes = [c_void_p, c_char_p]
         self.__to_commands.restype = c_char_p
 
-        self.__read_internal = self.__lib.read_internal
-        self.__read_internal.argtypes = [c_char_p]
-        self.__read_internal.restype = c_void_p
+        self.__read_yojson = self.__lib.read_yojson
+        self.__read_yojson.argtypes = [c_char_p]
+        self.__read_yojson.restype = c_void_p
 
-        self.__write_internal = self.__lib.write_internal
-        self.__write_internal.argtypes = [c_void_p, c_char_p]
+        self.__write_yojson = self.__lib.write_yojson
+        self.__write_yojson.argtypes = [c_void_p, c_char_p]
 
         self.__to_json = self.__lib.to_json
         self.__to_json.argtypes = [c_void_p]
@@ -188,7 +188,7 @@ class ConfigTree(object):
             self.__config = address
             self.__version = ''
         elif internal is not None:
-            config = self.__read_internal(internal.encode())
+            config = self.__read_yojson(internal.encode())
             if config is None:
                 msg = self.__get_error().decode()
                 raise ValueError('Failed to read internal rep: {0}'.format(msg))
@@ -232,8 +232,12 @@ class ConfigTree(object):
     def get_version_string(self):
         return self.__version
 
+    def read_cache(self, file_name):
+        addr = self.__read_yojson(file_name.encode())
+        return ConfigTree(address=addr)
+
     def write_cache(self, file_name):
-        self.__write_internal(self._get_config(), file_name.encode())
+        self.__write_yojson(self._get_config(), file_name.encode())
 
     def to_string(self, ordered_values=False, no_version=False):
         config_string = self.__to_string(self.__config, ordered_values).decode()
