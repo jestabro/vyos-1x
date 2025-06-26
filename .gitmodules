@@ -1,4 +1,4 @@
 [submodule "libvyosconfig"]
 	path = libvyosconfig
-	url = ../../vyos/libvyosconfig
-	branch = current
+	url = ../../jestabro/libvyosconfig
+	branch = direct-merge-config
