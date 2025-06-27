@@ -232,9 +232,9 @@ class ConfigTree(object):
     def get_version_string(self):
         return self.__version
 
-#    def read_cache(self, file_name):
-#        addr = self.__read_yojson(file_name.encode())
-#        return ConfigTree(address=addr)
+    def read_cache(self, file_name):
+        addr = self.__read_yojson(file_name.encode())
+        return addr
 
     def write_cache(self, file_name):
         self.__write_yojson(self._get_config(), file_name.encode())
@@ -450,7 +450,7 @@ class ConfigTree(object):
 
 def read_cache(file_name) -> ConfigTree:
     nt = ConfigTree('')
-    addr = nt.__read_yojson(file_name.encode())
+    addr = nt.read_cache(file_name)
     return ConfigTree(address=addr)
 
 def show_diff(left, right, path=[], commands=False, libpath=LIBPATH):
