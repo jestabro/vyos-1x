@@ -20,6 +20,7 @@ import subprocess
 from typing import Union
 
 from vyos.configtree import ConfigTree
+from vyos.configtree import read_cache
 from vyos.utils.boot import boot_configuration_complete
 from vyos.vyconf_session import VyconfSession
 from vyos.vyconf_session import VyconfSessionError
@@ -342,8 +343,8 @@ class ConfigSourceVyconfSession(ConfigSource):
         self.running_cache_path = os.path.join(session_dir, f'running_cache_{out}')
         self.session_cache_path = os.path.join(session_dir, f'session_cache_{out}')
 
-        self._running_config = ConfigTree(internal=self.running_cache_path)
-        self._session_config = ConfigTree(internal=self.session_cache_path)
+        self._running_config = read_cache(self.running_cache_path)
+        self._session_config = read_cache(self.session_cache_path)
 
         # N.B. level not yet implemented pending integration with legacy CLI
         # cf. T7374
