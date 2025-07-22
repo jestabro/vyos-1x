@@ -302,7 +302,9 @@ def read_interface_config() -> bool:
             continue
         nodes = config.list_nodes(base)
         for intf in nodes:
-            hwid = config.return_value(base + [intf] + ['hw-id'])
+            hwid = ''
+            if config.exists(base + [intf] + ['hw-id']):
+                hwid = config.return_value(base + [intf] + ['hw-id'])
             if not hwid:
                 return False
             update_mapping(FIXED, hwid, intf)
