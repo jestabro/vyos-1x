@@ -22,6 +22,7 @@ from glob import glob
 from sys import exit
 from vyos.base import Warning
 from vyos.config import Config
+from vyos.config import ConfigDict
 from vyos.configdict import is_node_changed
 from vyos.configdiff import get_config_diff, Diff
 from vyos.configdep import set_dependents, call_dependents
@@ -117,6 +118,20 @@ def geoip_updated(conf, firewall):
 
     return False
 
+
+def prune_chains_added_by_default(d: ConfigDict):
+    for p in ('ipv4', 'ipv6', 'bridge'):
+        for q in ('forward', 'input', 'output', 'prerouting'):
+            for r in ('filter', 'raw'):
+                path = [p] + [q] + [r]
+                if d.from_defaults(path):
+                    del d[p][q][r]
+                    if not d[p][q]:
+                        del d[p][q]
+        if p in d and not d[p]:
+            del d[p]
+
+
 def get_config(config=None):
     if config:
         conf = config
@@ -129,6 +144,7 @@ def get_config(config=None):
                                     get_first_key=True,
                                     with_recursive_defaults=True)
 
+    prune_chains_added_by_default(firewall)
 
     firewall['group_resync'] = bool('group' in firewall or is_node_changed(conf, base + ['group']))
     if firewall['group_resync']:
