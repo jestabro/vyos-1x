@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+# Copyright VyOS maintainers and contributors <maintainers@vyos.io>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or later as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+import re
+import json
+from pathlib import Path
+
+
+def filter_key(s: Path):
+    s = s.stem
+    return re.match(r'\d+\-.+', s)
+
+
+def sort_key(s: Path):
+    s = s.stem
+    pre, rem = re.match(r'(\d+)(?:-)(.+)', s).groups()
+    return int(pre), rem
+
+
+activation_dir = 'src/activation-scripts'
+activation_list = 'data/activation-list'
+
+activation_scripts = Path(activation_dir).glob('*.py')
+
+filtered = filter(filter_key, activation_scripts)
+script_list = sorted(filtered, key=sort_key)
+script_dict = dict.fromkeys(map(lambda s: s.stem, script_list), 'persistent')
+
+Path(activation_list).write_text(json.dumps(script_dict))

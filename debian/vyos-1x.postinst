@@ -161,6 +161,11 @@ mkdir -p /var/cache/vyos /usr/share/vyos-geoip
 chown -R root:vyattacfg /var/cache/vyos /usr/share/vyos-geoip
 chmod -R 775 /var/cache/vyos /usr/share/vyos-geoip
 
+# install activation list
+if [ -f /usr/share/vyos/activation-list ]; then
+  /usr/libexec/vyos/install-activation-list.py /usr/share/vyos/activation-list /opt/vyatta/etc/config/activation-list
+fi
+
 touch /etc/environment
 
 if [ ! -f /etc/bash_completion ]; then
