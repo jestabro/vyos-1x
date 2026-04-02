@@ -104,11 +104,13 @@ def set_active(name: str, value: ActiveOpt, no_prompt: bool = False):
     if not full_name:
         Warn(f'No activation script {name}')
         return
-    if full_name.startswith('00'):
-        Warn(f'Script {name} should not be reset')
-        return
 
     state = get_activation(full_name)
+
+    if state == 'never':
+        Warn(f'{name} has been set to \'never\' and should not be reset')
+        return
+
     if value == state:
         print(UNCHANGED)
         return
