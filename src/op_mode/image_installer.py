@@ -40,6 +40,7 @@ from vyos.base import Warning
 from vyos.configtree import ConfigTree
 from vyos.defaults import base_dir
 from vyos.defaults import directories
+from vyos.defaults import activation_hint
 from vyos.remote import download
 from vyos.system import disk
 from vyos.system import grub
@@ -123,6 +124,7 @@ CONST_RESERVED_SPACE: int = (2 + 1 + 256) * 1024**2
 
 # define directories and paths
 DIR_CONFIG: str = directories['config']
+DIR_DATA: str = directories['data']
 DIR_INSTALLATION: str = '/mnt/installation'
 DIR_ROOTFS_SRC: str = f'{DIR_INSTALLATION}/root_src'
 DIR_ROOTFS_DST: str = f'{DIR_INSTALLATION}/root_dst'
@@ -985,6 +987,14 @@ def install_image() -> None:
         if is_raid_install(install_target):
             write_dir: str = f'{DIR_DST_ROOT}/boot/{image_name}/rw'
             raid.update_default(write_dir)
+
+        # set activation hint
+        target_data_dir: str = f'{DIR_DST_ROOT}/boot/{image_name}/rw{DIR_DATA}/'
+        data_path = Path(target_data_dir)
+        data_path.mkdir(parents=True)
+        data_path.chmod(0o755)
+        init_hint = data_path.joinpath(Path(activation_hint).name)
+        init_hint.touch()
 
         setup_grub(DIR_DST_ROOT)
         # add information about version
