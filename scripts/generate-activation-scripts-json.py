@@ -37,6 +37,6 @@ activation_scripts = Path(activation_dir).glob('*.py')
 
 filtered = filter(filter_key, activation_scripts)
 script_list = sorted(filtered, key=sort_key)
-script_dict = dict.fromkeys(map(lambda s: s.stem, script_list), 'persistent')
+script_dict = dict.fromkeys(map(lambda s: s.stem, script_list), 'off')
 
 Path(activation_list).write_text(json.dumps(script_dict))
