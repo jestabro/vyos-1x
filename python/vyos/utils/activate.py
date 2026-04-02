@@ -24,7 +24,7 @@ from vyos.defaults import activation_hint
 from vyos.defaults import directories
 
 
-ActiveOpt = typing.Literal['persistent', 'once', 'off']
+ActiveOpt = typing.Literal['persistent', 'once', 'off', 'never']
 
 
 def get_activation_scripts() -> dict:
