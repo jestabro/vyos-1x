@@ -32,4 +32,4 @@ def activate(_config: ConfigTree) -> None:
 def post_condition() -> None:
     if is_first_installed_boot():
         set_config_path_hint()
-        set_activation(__file__, 'off')
+        set_activation(__file__, 'never')
