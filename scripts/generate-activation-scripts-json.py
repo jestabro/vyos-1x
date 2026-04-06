@@ -32,7 +32,7 @@ def sort_key(s: Path):
 
 activation_dir = 'src/activation-scripts'
 activation_list = 'data/activation-list'
-activation_list_init = 'data/activation-list.init'
+activation_list_init = 'data/activation-init'
 
 activation_scripts = Path(activation_dir).glob('*.py')
 
