@@ -25,7 +25,7 @@ from vyos.defaults import activation_hint
 from vyos.defaults import directories
 
 
-ActiveOpt = typing.Literal['persistent', 'once', 'off', 'never']
+ActiveOpt = typing.Literal['enabled', 'once', 'off', 'never']
 
 
 def get_activation_scripts() -> dict:
@@ -50,7 +50,7 @@ def get_activation(file_name: str) -> ActiveOpt:
 def is_active(file_name: str) -> bool:
     script_dict = get_activation_scripts()
     file_key = Path(file_name).stem
-    if script_dict[file_key] in ('persistent', 'once'):
+    if script_dict[file_key] in ('enabled', 'once'):
         return True
     return False
 
