@@ -94,7 +94,7 @@ def show(raw: bool):
 
 
 def set_active(name: str, value: ActiveOpt, no_prompt: bool = False):
-    PROMPT_PERSISTENT = f'This will set {name} active on all subsequent reboots, until manually disabled. Proceed ?'
+    PROMPT_ENABLED = f'This will set {name} active on subsequent reboots. Proceed ?'
     PROMPT_ONCE = f'This will set {name} active only for the next reboot. Proceed ?'
     PROMPT_OFF = f'This will set {name} inactive. Proceed ?'
     UNCHANGED = f'{name} is already set to {value}'
@@ -120,8 +120,8 @@ def set_active(name: str, value: ActiveOpt, no_prompt: bool = False):
         return
 
     match value:
-        case 'persistent':
-            message = PROMPT_PERSISTENT
+        case 'enabled':
+            message = PROMPT_ENABLED
         case 'once':
             message = PROMPT_ONCE
         case 'off':
