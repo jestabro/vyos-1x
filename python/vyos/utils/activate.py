@@ -20,6 +20,7 @@ from pathlib import Path
 
 from vyos.base import Warning as Warn
 from vyos.defaults import activation_list
+from vyos.defaults import activation_init
 from vyos.defaults import activation_hint
 from vyos.defaults import directories
 
@@ -61,26 +62,28 @@ def stable_update(new: dict, old: dict):
     return res
 
 
-def init_activation_list():
+def init_activation_list() -> bool:
     """Init if activation_hint exists, left on install_image or if image was
     built as raw_image"""
 
     init_hint = Path(activation_hint)
     if not init_hint.exists():
-        return
+        return False
 
     init_hint.unlink()
-    init_list = Path(activation_list)
-    data_list = Path(directories['data']).joinpath(Path(activation_list).name)
-    data_obj = json.loads(data_list.read_text())
-    init_obj = dict.fromkeys(data_obj.keys(), 'persistent')
-    init_list.write_text(json.dumps(init_obj))
+    init_list = Path(activation_init)
+    data_list = Path(activation_list)
+    data_obj = json.loads(init_list.read_text())
+    data_list.write_text(json.dumps(data_obj))
+
+    return True
 
 
 def refresh_activation_list():
     """Refresh activation list, as will be needed after image update"""
 
-    init_activation_list()
+    if init_activation_list():
+        return
 
     new_list_path = Path(directories['data']).joinpath(Path(activation_list).name)
     if not new_list_path.exists():
