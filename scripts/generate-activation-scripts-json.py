@@ -32,11 +32,15 @@ def sort_key(s: Path):
 
 activation_dir = 'src/activation-scripts'
 activation_list = 'data/activation-list'
+activation_list_init = 'data/activation-list.init'
 
 activation_scripts = Path(activation_dir).glob('*.py')
 
 filtered = filter(filter_key, activation_scripts)
 script_list = sorted(filtered, key=sort_key)
+
 script_dict = dict.fromkeys(map(lambda s: s.stem, script_list), 'off')
+script_dict_init = dict.fromkeys(map(lambda s: s.stem, script_list), 'persistent')
 
 Path(activation_list).write_text(json.dumps(script_dict))
+Path(activation_list_init).write_text(json.dumps(script_dict_init))
