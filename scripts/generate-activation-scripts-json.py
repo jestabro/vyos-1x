@@ -40,7 +40,7 @@ filtered = filter(filter_key, activation_scripts)
 script_list = sorted(filtered, key=sort_key)
 
 script_dict = dict.fromkeys(map(lambda s: s.stem, script_list), 'off')
-script_dict_init = dict.fromkeys(map(lambda s: s.stem, script_list), 'persistent')
+script_dict_init = dict.fromkeys(map(lambda s: s.stem, script_list), 'enabled')
 
 Path(activation_list).write_text(json.dumps(script_dict))
 Path(activation_list_init).write_text(json.dumps(script_dict_init))
