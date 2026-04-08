@@ -62,7 +62,7 @@ tagNode = element tagNode
 leafNode = element leafNode
 {
     (ownerAttr? & nodeNameAttr),
-    (defaultValue? & properties)
+    (defaultValue* & properties)
 }
 
 # Default value for leaf node, if applicable

@@ -110,9 +110,9 @@
         <ref name="nodeNameAttr"/>
       </interleave>
       <interleave>
-        <optional>
+        <zeroOrMore>
           <ref name="defaultValue"/>
-        </optional>
+        </zeroOrMore>
         <ref name="properties"/>
       </interleave>
     </element>
