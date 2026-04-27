@@ -63,6 +63,21 @@ def set_tags(ct: 'ConfigTree', path: list) -> None:
         if condition:
             ct.set_tag(target)
 
+
+def set_leaf(ct: 'ConfigTree', path: list) -> None:
+    from vyos.xml_ref import is_leaf
+
+    try:
+        if is_leaf(path):
+            ct.set_leaf(path)
+    except ValueError:
+        try:
+            if is_leaf(path[:-1]):
+                ct.set_leaf(path[:-1])
+        except ValueError:
+            return
+
+
 def parse_commands(cmds: str) -> dict:
     from re import split as re_split
     from shlex import split as shlex_split
