@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+#
+# Copyright (C) VyOS Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 or later as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+
+# Use lxml xpath capability to detect multiple help elements at the same
+# path.
+# If the enclosing properties element contains more than the help element at
+# more than one place in the file, announce a collision.
+# If the help elements differ in content, announce an inconsistency.
+
+
+import sys
+import glob
+from lxml import etree
+
+
+def check_redundant_properties(dir_name):
+    # pylint: disable=too-many-locals,too-many-branches,c-extension-no-member
+    """
+    Collect elements with help tag into dictionary indexed by name
+    attributes of ancestor path.
+    """
+    for fname in glob.glob(f'{dir_name}/*.xml'):
+        tree = etree.parse(fname)
+        defv = {}
+
+        xpath_str = '//help'
+        xp = tree.xpath(xpath_str)
+
+        for element in xp:
+            ap = element.xpath('ancestor::*[@name]')
+            ap_name = [el.get('name') for el in ap]
+            ap_path_str = ' '.join(ap_name)
+            defv.setdefault(ap_path_str, []).append(element)
+
+        trivial = []
+        for k, v in defv.items():
+            if len(v) < 2:
+                trivial.append(k)
+        for i in trivial:
+            del defv[i]
+
+        for k, v in defv.items():
+            multiple = []
+            collisions = []
+            for i in v:
+                multiple.append(i)
+                # If properties contains more than just a help element:
+                if len(i.getparent().getchildren()) > 1:
+                    collisions.append(i)
+            if len(collisions) > 1:
+                print(f'Collision in file {fname}:')
+                for e in collisions:
+                    print(f'Element is {e.tag} with content {e.text} at {e.sourceline}')
+            text_set = set()
+            for e in multiple:
+                text_set.add(e.text)
+            if len(text_set) > 1:
+                print(f'Inconsistent help elements in file {fname}:')
+                for e in multiple:
+                    print(f'Element is {e.tag} with content {e.text} at {e.sourceline}')
+
+
+def main():
+    if len(sys.argv) < 2:
+        print('Must specify XML directory!')
+        sys.exit(1)
+
+    dir_name = sys.argv[1]
+
+    check_redundant_properties(dir_name)
+
+
+if __name__ == '__main__':
+    main()
