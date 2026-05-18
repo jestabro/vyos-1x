@@ -36,7 +36,7 @@ from vyos.template import bracketize_ipv6
 CONFIG_FILE = '/run/config_sync_conf.conf'
 
 # Logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.name = os.path.basename(__file__)
 
@@ -104,8 +104,15 @@ def retrieve_config(
     mask_ex = subtree_from_list_of_partial_paths(config_tree, exclude_list)
     mask_ex_str = json.dumps(exclude_list)
 
+    logger.info(f'JSE mask_in: {mask_in.to_string()}')
+
+    logger.info(f'JSE mask_ex: {mask_ex.to_string()}')
+
     masked = mask_inclusive(config_tree, mask_in)
+    logger.info(f'JSE masked after inclusive: {masked.to_string()}')
+
     masked = mask_exclusive(masked, mask_ex)
+    logger.info(f'JSE masked after exclusive: {masked.to_string()}')
 
     mask_dict = {'inclusive': mask_in_str, 'exclusive': mask_ex_str}
     config_dict = json.loads(masked.to_json())
@@ -189,7 +196,8 @@ def config_sync(
     # Sync sections ("nat", "firewall", etc)
     mask_dict, config_dict = retrieve_config(sections, exclusions)
     logger.debug(
-        f"Retrieved config for sections '{sections}': {config_dict}")
+        f"Retrieved config for sections '{sections}'; mask_dict: {mask_dict}; config_dict {config_dict}"
+    )
 
     set_config = set_remote_config(address=secondary_address,
                                    key=secondary_key,

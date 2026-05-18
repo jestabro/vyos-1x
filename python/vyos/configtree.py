@@ -29,6 +29,7 @@ BUILD_PATH = '/tmp/libvyosconfig/_build/libvyosconfig.so'
 INSTALL_PATH = '/usr/lib/libvyosconfig.so.0'
 LIBPATH = BUILD_PATH if os.path.isfile(BUILD_PATH) else INSTALL_PATH
 
+LOG = logging.getLogger('http_api.configsession')
 
 def replace_backslash(s, search, replace):
     """Modify quoted strings containing backslashes not of escape sequences"""
@@ -671,12 +672,18 @@ def delete_tree_from_masks(
     config_tree: ConfigTree, include_mask: ConfigTree, exclude_mask: ConfigTree
 ):
     masked_inc = mask_inclusive(config_tree, include_mask)
+    LOG.info(f'JSE configtree masked_inc: {masked_inc.to_string()}')
     # Here we want the reversed stand-alone exclusion/inclusion.
     # This simplifies definition of delete paths as (delete)
     # difference between the two trees of config data.
     masked_upper_bound = mask_exclusive(config_tree, include_mask)
+    LOG.info(f'JSE configtree masked_upper_bound: {masked_upper_bound.to_string()}')
+
     masked_lower_bound = mask_inclusive(config_tree, exclude_mask)
+    LOG.info(f'JSE configtree masked_lower_bound: {masked_lower_bound.to_string()}')
+
     masked_exc = union(masked_upper_bound, masked_lower_bound)
+    LOG.info(f'JSE configtree masked_exc: {masked_exc.to_string()}')
 
     ret = DiffTree(masked_inc, masked_exc)
     return ret.delete

@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import json
+import logging
 import weakref
 import subprocess
 from tempfile import NamedTemporaryFile
@@ -39,6 +40,7 @@ from vyos.derivedtree import subtree_from_list_of_partial_paths
 # type of config file path or configtree
 ConfigObj: TypeAlias = Union[str, ConfigTree]
 
+LOG = logging.getLogger('http_api.configsession')
 
 CLI_SHELL_API = '/bin/cli-shell-api'
 SET = '/opt/vyatta/sbin/my_set'
@@ -323,15 +325,23 @@ class ConfigSession(object):
             mask_ex_list = json.loads(mask_dict['exclusive'])
             mask_ex = subtree_from_list_of_partial_paths(config_tree, mask_ex_list)
 
+            LOG.info(f'JSE mask_in: {mask_in.to_string()}')
+            LOG.info(f'JSE mask_ex_list: {mask_ex_list}')
+            LOG.info(f'JSE mask_ex (subtree_from_partial): {mask_ex.to_string()}')
+
             delete_dict = delete_dict_from_masks(config_tree, mask_in, mask_ex)
+
+            LOG.info(f'JSE delete_dict: {delete_dict}')
 
             if delete_dict:
                 for p in dict_to_paths(delete_dict):
-                    self.delete(p)
+                    LOG.info(f'JSE deleting {p}')
+#                    self.delete(p)
 
             if config_dict:
                 for p in dict_to_paths(config_dict):
-                    self.set(p)
+                    LOG.info(f'JSE setting {p}')
+#                    self.set(p)
         except (ValueError, ConfigSessionError, ConfigTreeError) as e:
             raise ConfigSessionError(e)
 
