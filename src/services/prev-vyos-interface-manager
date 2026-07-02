@@ -361,7 +361,7 @@ def load_fixed_mapping() -> bool:
     return False
 
 
-def load_found_mapping(context) -> list[InterfaceName]:
+def load_found_mapping(context) -> bool:
     """Load map of hwid -> interface names, as reported by udev."""
     for device in context.list_devices(subsystem='net'):
         naddr = None
@@ -491,13 +491,7 @@ def order_by_pci_addr(ctx, mapping):
     pass
 
 
-def initialize(context) -> bool:
-    if not (found_map := load_found_mapping(context)):
-        logger.error('No interfaces found; exiting')
-        return False
-
-    if not found:
-
+def initialize(context):
     if not load_found_mapping(context):
         logger.error('no interfaces found')
         return
@@ -551,8 +545,6 @@ def initialize(context) -> bool:
         write_config_remove(removed)
         write_config_add(added)
 
-    return True
-
 
 def interface_event(device):
     logger.info(f'udev event, device is {device}; action is {device.action}')
@@ -602,8 +594,7 @@ def main():
 
     context = pyudev.Context()
 
-    if not initialize(context):
-        sys.exit(1)
+    initialize(context)
 
     monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by('net')
