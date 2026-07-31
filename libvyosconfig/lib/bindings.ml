@@ -13,6 +13,7 @@ module TA = Tree_alg
 module CM = Commit
 module VC = Vycall_client
 module CDict = Config_dict
+module D = Diff
 
 module I = Internal.Make(Config_tree)
 module IR = Internal.Make(Reference_tree)
@@ -430,6 +431,21 @@ let diff_tree path c_ptr_l c_ptr_r =
         | CD.Incommensurable -> error_message := "Incommensurable"; Ctypes.null
         | CD.Empty_comparison -> error_message := "Empty comparison"; Ctypes.null
 
+let diff_tree2 path c_ptr_l c_ptr_r =
+    (* alert exn D.diff_tree2:
+        [Diff.Incommensurable2] caught
+        [Diff.Empty_comparison2] caught
+     *)
+    let path = split_on_whitespace path in
+    let ct_l = Root.get c_ptr_l in
+    let ct_r = Root.get c_ptr_r in
+    try
+        let ct_ret = (D.diff_tree2[@alert "-exn"]) path ct_l ct_r in
+        Ctypes.Root.create ct_ret
+    with
+        | D.Incommensurable2 -> error_message := "Incommensurable"; Ctypes.null
+        | D.Empty_comparison2 -> error_message := "Empty comparison"; Ctypes.null
+
 let diff_compare cmds path c_ptr_l c_ptr_r =
     (* alert exn CD.show_diff:
         [Config_diff.Incommensurable] caught
@@ -577,6 +593,7 @@ struct
   let () = I.internal "return_value" ((ptr void) @-> string @-> returning string) return_value
   let () = I.internal "return_values" ((ptr void) @-> string @-> returning string) return_values
   let () = I.internal "diff_tree" (string @-> (ptr void) @-> (ptr void) @-> returning (ptr void)) diff_tree
+  let () = I.internal "diff_tree2" (string @-> (ptr void) @-> (ptr void) @-> returning (ptr void)) diff_tree2
   let () = I.internal "diff_compare" (bool @-> string @-> (ptr void) @-> (ptr void) @-> returning string) diff_compare
   let () = I.internal "tree_union" ((ptr void) @-> (ptr void) @-> returning (ptr void)) tree_union
   let () = I.internal "tree_merge" (bool @-> (ptr void) @-> (ptr void) @-> returning (ptr void)) tree_merge

@@ -897,6 +897,52 @@ class DiffTree:
         return delete + '\n' + add
 
 
+class DiffTree2:
+    # pylint: disable=too-many-instance-attributes,too-few-public-methods
+    def __init__(self, left, right, path=None, libpath=LIBPATH):
+        if left is None:
+            left = ConfigTree(config_string='\n')
+        if right is None:
+            right = ConfigTree(config_string='\n')
+        if not (isinstance(left, ConfigTree) and isinstance(right, ConfigTree)):
+            raise TypeError('Arguments must be instances of ConfigTree')
+        path = path or []
+        if path:
+            if not left.exists(path):
+                raise ConfigTreeError(f"Path {path} doesn't exist in lhs tree")
+            if not right.exists(path):
+                raise ConfigTreeError(f"Path {path} doesn't exist in rhs tree")
+
+        self.left = left
+        self.right = right
+
+        self.__lib = cdll.LoadLibrary(libpath)
+
+        self.__diff_tree2 = self.__lib.diff_tree2
+        self.__diff_tree2.argtypes = [c_char_p, c_void_p, c_void_p]
+        self.__diff_tree2.restype = c_void_p
+
+        check_path(path)
+        path_str = ' '.join(map(str, path)).encode()
+
+        res = self.__diff_tree2(path_str, left.get_tree(), right.get_tree())
+
+        # full diff config_tree and python dict representation
+        self.full = ConfigTree(address=res)
+        self.dict = json.loads(self.full.to_json())
+
+        # config_tree sub-trees
+        self.add = self.full.get_subtree(['add'])
+        self.sub = self.full.get_subtree(['sub'])
+        self.inter = self.full.get_subtree(['inter'])
+        self.delete = self.full.get_subtree(['del'])
+
+    def to_commands(self):
+        add = self.add.to_commands()
+        delete = self.delete.to_commands(op='delete')
+        return delete + '\n' + add
+
+
 def deep_copy(config_tree: ConfigTree) -> ConfigTree:
     """An inelegant, but reasonably fast, copy; replace with backend copy"""
     D = DiffTree(None, config_tree)
