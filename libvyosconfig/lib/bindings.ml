@@ -576,23 +576,34 @@ let get_owner c_ptr path =
 
 let get_multi_nodes c_ptr tag_value_placeholder =
     let rt = Root.get c_ptr in
-    Util_rt.get_multi_nodes ~tag_value_placeholder:tag_value_placeholder rt
+    Util_rt.get_multi_nodes_yojson ~tag_value_placeholder:tag_value_placeholder rt
 
 let get_tag_nodes c_ptr tag_value_placeholder =
     let rt = Root.get c_ptr in
-    Util_rt.get_tag_nodes ~tag_value_placeholder:tag_value_placeholder rt
+    Util_rt.get_tag_nodes_yojson ~tag_value_placeholder:tag_value_placeholder rt
 
 let get_nodes_of_kind c_ptr kind tag_value_placeholder =
     let rt = Root.get c_ptr in
-    Util_rt.get_nodes_of_kind ~tag_value_placeholder:tag_value_placeholder rt kind
+    Util_rt.get_nodes_of_kind_yojson ~tag_value_placeholder:tag_value_placeholder rt kind
 
 let get_rdeps_of_kind c_ptr kind tag_value_placeholder =
     let rt = Root.get c_ptr in
-    Util_rt.get_rdeps_of_kind ~tag_value_placeholder:tag_value_placeholder rt kind
+    Util_rt.get_rdeps_of_kind_yojson ~tag_value_placeholder:tag_value_placeholder rt kind
 
 let get_rdeps_of_kind_data c_ptr kind tag_value_placeholder =
     let rt = Root.get c_ptr in
-    Util_rt.get_rdeps_of_kind_data ~tag_value_placeholder:tag_value_placeholder rt kind
+    Util_rt.get_rdeps_of_kind_data_yojson ~tag_value_placeholder:tag_value_placeholder rt kind
+
+let subtree_values_of_path c_ptr_rt c_ptr_ct path =
+    let rt = Root.get c_ptr_rt in
+    let ct = Root.get c_ptr_ct in
+    let path = split_on_whitespace path in
+    try
+        error_message := "";
+        (Derived.subtree_values_of_path_yojson[@alert "-exn"]) rt ct path
+    with
+        Derived.Malformed_path s ->
+            error_message := s; "#1@"
 
 module Stubs(I : Cstubs_inverted.INTERNAL) =
 struct
@@ -649,4 +660,5 @@ struct
   let () = I.internal "get_nodes_of_kind" ((ptr void) @-> string @-> string @-> returning string) get_nodes_of_kind
   let () = I.internal "get_rdeps_of_kind" ((ptr void) @-> string @-> string @-> returning string) get_rdeps_of_kind
   let () = I.internal "get_rdeps_of_kind_data" ((ptr void) @-> string @-> string @-> returning string) get_rdeps_of_kind_data
+  let () = I.internal "subtree_values_of_path" ((ptr void) @-> (ptr void) @-> string @-> returning string) subtree_values_of_path
 end

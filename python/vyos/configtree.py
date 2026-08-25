@@ -766,6 +766,40 @@ def subtree_from_partial(
     return tree
 
 
+def subtree_values_of_path(
+    config_tree: ConfigTree,
+    path: list[str],
+    reference_tree: 'ReferenceTree',
+    libpath=LIBPATH,
+) -> list[tuple[list[str], list[str]]]:
+    # pylint: disable=raise-missing-from
+    check_path(path)
+    path_str = ' '.join(map(str, path)).encode()
+
+    try:
+        __lib = cdll.LoadLibrary(libpath)
+        __subtree_values_of_path = __lib.subtree_values_of_path
+        __subtree_values_of_path.argtypes = [c_void_p, c_void_p, c_char_p]
+        __subtree_values_of_path.restype = c_char_p
+        __get_error = __lib.get_error
+        __get_error.argtypes = []
+        __get_error.restype = c_char_p
+
+        res = __subtree_values_of_path(
+            reference_tree.get_tree(),
+            config_tree.get_tree(),
+            path_str,
+        )
+        res = res.decode()
+    except Exception as e:
+        raise ConfigTreeError(e)
+    if res == '#1@':
+        msg = __get_error().decode()
+        raise ConfigTreeError(msg)
+
+    return res
+
+
 def reference_tree_to_json(from_dir, to_file, internal_cache='', libpath=LIBPATH):
     # pylint: disable=raise-missing-from
     try:
