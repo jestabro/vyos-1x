@@ -73,6 +73,7 @@ setup(
     entry_points={
         "console_scripts": [
             "config-mgmt = vyos.config_mgmt:run",
+            "apply-path = vyos.apply_path:run",
         ],
     },
     cmdclass={

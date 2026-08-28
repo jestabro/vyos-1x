@@ -21,6 +21,7 @@ lib/
 opt/
 srv/localui
 usr/sbin
+usr/bin/apply-path
 usr/bin/config-mgmt
 usr/bin/initial-setup
 usr/bin/vyos-show-config
