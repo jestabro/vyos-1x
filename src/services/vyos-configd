@@ -384,7 +384,7 @@ if __name__ == '__main__':
                 logger.debug(f'scripts_called: {scripts_called}')
 
                 if should_render_frr(config):
-                    frr_config = config_manager.get_frr_config()
+                    frr_config = config_manager.get_partial_config()
                     r, o = call_frr_render(frr, frr_config)
                     if res == Response.SUCCESS:
                         res = r

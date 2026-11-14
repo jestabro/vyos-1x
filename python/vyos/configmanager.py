@@ -123,7 +123,7 @@ class ConfigManager:
         else:
             self.running_config = config.get_config_tree(effective=True)
             self.session_config = config.get_config_tree()
-            self.partial_config = self.session_config
+            self.partial_config = self.session_config.deep_copy()
             self.diff_tree = DiffTree(self.running_config, self.session_config)
 
         if self.cache_config:
@@ -234,7 +234,7 @@ class ConfigManager:
         # Here and below we are using knowledge of the internal structure of
         # the interface-definitiona: we only add the first instance of a
         # path under ownership by owner; those under ['vrf', 'name'] are
-        # reconstructed under trim_partial_config in the presence of argv.
+        # reconstructed under update_partial_config in the presence of argv.
         #
         def func(d, path, res):
             for k, v in d.items():
@@ -252,17 +252,20 @@ class ConfigManager:
 
         return func(self.reference_tree_dict, [], {})
 
-    def trim_partial_config(self, owner, tag_value, argv):
+    def update_partial_config(self, owner, tag_value, argv):
         tag_component = [tag_value] if tag_value else []
         path = self.owner_dict[owner] + tag_component
         if len(argv) > 1:
             path = ['vrf', 'name', argv[1]] + path
-        self.frr_config.delete(path)
 
-    def get_frr_config(self) -> Config:
-        frr_config_source = ConfigSourceTree(self.running_config, self.frr_config)
-        return Config(config_source=frr_config_source)
+        if self.diff_tree.add.exists(path):
+            self.partial_config.delete(path)
+        if self.diff_tree.sub.exists(path):
+            self.partial_config.clone(self.diff_tree.sub, path)
 
+    def get_partial_config(self) -> Config:
+        partial_config_source = ConfigSourceTree(self.running_config, self.partial_config)
+        return Config(config_source=partial_config_source)
 
     #
     # Wrappers of config mode script canonical functions.
