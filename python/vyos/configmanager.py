@@ -78,7 +78,7 @@ class ConfigManager:
         self.config: Config = None
         self.running_config: ConfigTree = None
         self.session_config: ConfigTree = None
-        self.frr_config = None
+        self.partial_config = None
         self.diff_tree: DiffTree = None
 
         self.components = self.init_components()
@@ -118,12 +118,12 @@ class ConfigManager:
         if config is None:
             self.running_config = None
             self.session_config = None
-            self.frr_config = None
+            self.partial_config = None
             self.diff_tree = None
         else:
             self.running_config = config.get_config_tree(effective=True)
             self.session_config = config.get_config_tree()
-            self.frr_config = self.session_config
+            self.partial_config = self.session_config
             self.diff_tree = DiffTree(self.running_config, self.session_config)
 
         if self.cache_config:
@@ -230,6 +230,12 @@ class ConfigManager:
             component.cache = None
 
     def get_owner_dict(self):
+        #
+        # Here and below we are using knowledge of the internal structure of
+        # the interface-definitiona: we only add the first instance of a
+        # path under ownership by owner; those under ['vrf', 'name'] are
+        # reconstructed under trim_partial_config in the presence of argv.
+        #
         def func(d, path, res):
             for k, v in d.items():
                 if not 'node_data' in v:
@@ -239,16 +245,18 @@ class ConfigManager:
                 owner = data.get('owner')
                 if owner is not None:
                     own = Path(owner.split()[0]).stem
-                    res[own] = subpath
+                    res.setdefault(own, subpath)
                 if isinstance(v, dict):
                     func(v, subpath, res)
             return res
 
         return func(self.reference_tree_dict, [], {})
 
-    def trim_frr_config(self, owner, tag_value):
+    def trim_partial_config(self, owner, tag_value, argv):
         tag_component = [tag_value] if tag_value else []
         path = self.owner_dict[owner] + tag_component
+        if len(argv) > 1:
+            path = ['vrf', 'name', argv[1]] + path
         self.frr_config.delete(path)
 
     def get_frr_config(self) -> Config:

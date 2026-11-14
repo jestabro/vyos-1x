@@ -249,7 +249,7 @@ def process_node_data(config_manager: ConfigManager, data) -> tuple[Response, st
             setattr(config, 'frr_commit_failed', True)
         else:
             logger.info(f'JSE frr trim script_name: {script_name}, tag_value: {tag_value}')
-            config_manager.trim_frr_config(script_name, tag_value)
+            config_manager.trim_frr_config(script_name, tag_value, args)
 #        elif script_name in ('interfaces_ethernet', 'interfaces_bonding') and tag_value:
             # EVPN of this interface is rendered by FRR, see call_frr_render()
 #            if_type = script_name.removeprefix('interfaces_')
