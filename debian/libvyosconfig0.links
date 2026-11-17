@@ -3,3 +3,4 @@
 /usr/libexec/vyos/vyconf/vyconf_cli /usr/libexec/vyos/vyconf/bin/vy_discard
 /usr/libexec/vyos/vyconf/vyconf_cli /usr/libexec/vyos/vyconf/bin/vy_copy
 /usr/libexec/vyos/vyconf/vyconf_cli /usr/libexec/vyos/vyconf/bin/vy_rename
+/usr/libexec/vyos/vyconf/vyconf_cli /usr/libexec/vyos/vyconf/bin/vy_comment
